@@ -103,6 +103,8 @@ claude mcp add jober -e JOBER_API_KEY=jbr_live_xxxxxxxx -- npx -y @joberhr/jober
 처음 연결할 때 브라우저에서 자버 로그인과 권한 동의 화면이 열리고, 허용하면 OAuth 2.1(PKCE) 토큰으로 연결됩니다.
 claude.ai·ChatGPT 의 사용자 지정 커넥터에도 같은 주소를 넣으면 됩니다.
 
+연결을 끊으려면 자버 웹의 **설정 > 연동 > 연결된 AI 도구**에서 해당 앱의 [연결 끊기]를 누르세요. 끊는 즉시 그 연결의 토큰이 모두 폐기되어 이후 호출은 401 이 됩니다. API 키는 같은 화면의 API 키 목록에서 폐기합니다.
+
 ```bash
 # Claude Code
 claude mcp add --transport http jober https://api.jober.io/mcp
