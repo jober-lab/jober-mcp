@@ -159,8 +159,9 @@ OAuth 대신 API 키를 쓰려면 `Authorization: Bearer jbr_live_xxxxxxxx` 헤�
 - **2단계 발송**: `prepare_send` 가 대상 수·예상 비용·렌더된 미리보기와 `operationUuid`·`confirmHash` 를 돌려줍니다. `submit_send` 는 이 값과 새 `idempotencyKey` 로 호출하며, 준비 이후 대상·본문·서식·비용이 바뀌었으면 거부되어 다시 준비해야 합니다. 별도의 사람 승인 단계는 없고, 발송 가능 여부는 아래 서버 정책으로 판단합니다(자동화 워크플로에서도 그대로 동작).
 - **멱등 키**: `submit_send` 는 `idempotencyKey` 가 필수이며, 같은 키로 다시 호출해도 한 번만 발송됩니다. 이 패키지는 실패한 호출을 자동 재시도하지 않습니다.
 - **접수 확인 대기**: `submit_send` 가 409 `J_41_23_4_5`(`pending`)를 돌려주거나 `get_campaign` 에 `pendingOperation` 이 있으면, 같은 `operationUuid`·`confirmHash`·`idempotencyKey` 로 다시 호출해 결과를 받으세요. 키를 잃었거나 `UNKNOWN` 이라 값이 없으면 새 키로 보내지 말고 `get_campaign` 으로 상태만 다시 확인합니다. 접수 여부를 모르는 응답(작업 조회 실패 409, `pendingOperation.status = UNKNOWN`)의 오류 코드는 `lastErrorCode`(마지막 오류 코드, 거절 확정 아님)로, 거절이 확정된 경우만 `sourceErrorCode` 로 옵니다.
-- **풀리지 않는 거절**: 구독·선불 잔액·연동비·발송 한도 같은 웹 발송 검증 거절은 `J_41_23_1_9`(`data.sourceErrorCode` = 원래 코드)이며 `needsPrepare` 가 없습니다. 다시 준비해도 같은 결과이므로 원인을 해결한 뒤 진행하세요. `prepare_send` 도 이 검증을 미리 하므로 대부분 준비 단계에서 걸립니다.
-- **늦게 접수된 발송**: `submit_send` 가 409 `J_41_23_4_9`(`data.superseded = true`)를 돌려주면 접수 확인이 늦어지는 사이 새 발송이 먼저 접수된 것입니다. 캠페인은 새 발송 기준이고, 늦은 예약은 서버가 취소합니다(`orphanCanceled`). 다시 준비하지 말고 `get_campaign` 으로 상태를 확인하세요.
+- **풀리지 않는 거절**: 구독·선불 잔액·연동비·발송 한도 같은 웹 발송 검증 거절은 `J_41_23_1_9`(`data.sourceErrorCode` = 원래 코드, `data.sourceMessage` = 원문 메시지)이며 `needsPrepare` 가 없습니다. 다시 준비해도 같은 결과이므로 원인을 해결한 뒤 진행하세요. `prepare_send` 도 이 검증을 미리 하므로 대부분 준비 단계에서 걸립니다.
+- **다시 준비 여부**: 실패 응답에 `data.needsPrepare` 가 있을 때만 `prepare_send` 부터 다시 하세요. 없으면(예: 아래 조건 거절) 다시 준비해도 같은 결과입니다.
+- **늦게 접수된 발송**: `submit_send` 가 409 `J_41_23_4_9`(`data.superseded = true`)를 돌려주면 접수 확인이 늦어지는 사이 다른 제출이 먼저 처리된 것입니다. `notSent: true` 면 이 요청은 발송하지 않고 중단됐고, `orphanTaskId` 가 있으면 늦게 접수된 발송이며 예약은 서버가 취소합니다(`orphanCanceled`). `reason: 'REVISION_CHANGED'` 는 그 사이 캠페인 내용이 바뀐 경우입니다. 어느 경우든 다시 준비하지 말고 `get_campaign` 으로 상태를 확인하세요.
 - **확정값 발송**: 예약 발송을 포함해 실제 발송은 `submit_send` 때 확정한 받는 사람(번호·이름)과 개인화 값으로 나갑니다. 그 뒤 연락처를 바꿔도 이미 확정한 발송 내용은 바뀌지 않습니다.
 - **수신자 제한**: 발송 대상은 `commit_recipients` 로 서버에 등록된 캠페인 대상뿐이며, 전화번호를 발송 요청에 직접 넣을 수 없습니다.
 - **서버 정책 동일 적용**: 스팸·금지 업종 차단, 수신거부 문구 자동 삽입, 광고성 메시지의 수신 동의 확인, 광고·쿠폰 메시지의 야간(21:00~08:00) 즉시 발송 금지(다음 날 08:00 예약 제안), 1000자 제한, 잔액·발송 한도 검사.
