@@ -164,6 +164,7 @@ OAuth 대신 API 키를 쓰려면 `Authorization: Bearer jbr_live_xxxxxxxx` 헤�
 - **결과 조회 상태**: `get_campaign_results` 응답의 `campaignStatus`·`canceledReason`(`SEND_STOPPED` = 발송 중단, `SCHEDULE_CANCELED` = 예약 취소)은 동기화 뒤 캠페인 상태이고, `statsAvailable: false` 면 집계할 발송 결과가 없습니다.
 - **늦게 접수된 발송**: `submit_send` 가 409 `J_41_23_4_9`(`data.superseded = true`)를 돌려주면 접수 확인이 늦어지는 사이 상태가 바뀐 것입니다. `data.reason` 으로 구분합니다: `NEWER_SUBMISSION`(새 제출이 먼저 접수), `STALE_SUBMISSION`(접수 확인이 늦어 멈춤, 새 제출 없음), `REVISION_CHANGED`(그 사이 캠페인 내용 변경), `CAMPAIGN_CLOSED`(캠페인이 이미 끝남). `notSent: true` 면 이 요청은 보내지 않고 멈췄고, `orphanTaskId` 가 있으면 늦게 접수된 발송이며 예약은 서버가 취소합니다(`orphanCanceled`). 어느 경우든 바로 다시 준비하지 말고 `get_campaign` 으로 상태를 확인하세요. `notSent` 이고 캠페인이 `READY`·`PREPARED` 면 사용자 확인 뒤 `prepare_send` 부터 다시 할 수 있습니다.
 - **확정값 발송**: 예약 발송을 포함해 실제 발송은 `submit_send` 때 확정한 받는 사람(번호·이름)과 개인화 값으로 나갑니다. 그 뒤 연락처를 바꿔도 이미 확정한 발송 내용은 바뀌지 않습니다.
+- **링크 없이 보내기**: `select_survey` 의 `NONE` 은 같은 템플릿의 버튼 없는 변형으로 바꿔 보냅니다. 버튼 없는 변형이 없는 템플릿(`get_campaign` 의 `noLinkAvailable: false`)은 `NONE` 이 400 `J_41_22_1_11` 이니 연결할 링크를 골라 주세요.
 - **개인화 변수 연결(재확정)**: `commit_recipients` 의 변수 연결은 매번 그 요청의 `customColumnMap` 기준으로 다시 정해집니다. 명단을 다시 확정할 때 기존 연결을 유지하려면 같은 칸에 `variable` 을 다시 지정하세요. `variable` 을 빼거나 그 칸을 빼면 연결이 풀리고(`unboundVariables`) 값을 다시 묻습니다.
 - **수신자 제한**: 발송 대상은 `commit_recipients` 로 서버에 등록된 캠페인 대상뿐이며, 전화번호를 발송 요청에 직접 넣을 수 없습니다.
 - **서버 정책 동일 적용**: 스팸·금지 업종 차단, 수신거부 문구 자동 삽입, 광고성 메시지의 수신 동의 확인, 광고·쿠폰 메시지의 야간(21:00~08:00) 즉시 발송 금지(다음 날 08:00 예약 제안), 1000자 제한, 잔액·발송 한도 검사.
