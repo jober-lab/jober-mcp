@@ -136,7 +136,7 @@ OAuth 대신 API 키를 쓰려면 `Authorization: Bearer jbr_live_xxxxxxxx` 헤�
 | 툴 | 하는 일 | 권한(scope) |
 |---|---|---|
 | `convert_message` | 문자 원문을 알림톡 캠페인 초안으로 변환 | `campaign:write` |
-| `get_campaign` | 캠페인 상세(서식, 변수, 미리보기, 경고) 조회 | `campaign:read` |
+| `get_campaign` | 캠페인 상세(서식, 변수, 미리보기, 경고) 조회. 조회할 때 멈춘 접수를 복구하며, 접수 결과를 아직 확인하지 못한 발송이 있으면 `pendingOperation`(SUBMITTING·UNKNOWN)을 함께 돌려줌 | `campaign:read` |
 | `update_campaign` | 발송명·변수 값·서식 수정, 혼합(MIXED) 캠페인만 정보성/광고성 선택(광고로 판정된 캠페인을 정보성으로 바꿀 수 없음) | `campaign:write` |
 | `list_templates` | 사용할 수 있는 알림톡 서식 목록 | `campaign:read` |
 | `list_surveys` | 랜딩으로 붙일 수 있는 기존 설문과 공유 링크 목록 | `campaign:read` |
@@ -158,6 +158,8 @@ OAuth 대신 API 키를 쓰려면 `Authorization: Bearer jbr_live_xxxxxxxx` 헤�
 
 - **2단계 발송**: `prepare_send` 가 대상 수·예상 비용·렌더된 미리보기와 `operationUuid`·`confirmHash` 를 돌려줍니다. `submit_send` 는 이 값과 새 `idempotencyKey` 로 호출하며, 준비 이후 대상·본문·서식·비용이 바뀌었으면 거부되어 다시 준비해야 합니다. 별도의 사람 승인 단계는 없고, 발송 가능 여부는 아래 서버 정책으로 판단합니다(자동화 워크플로에서도 그대로 동작).
 - **멱등 키**: `submit_send` 는 `idempotencyKey` 가 필수이며, 같은 키로 다시 호출해도 한 번만 발송됩니다. 이 패키지는 실패한 호출을 자동 재시도하지 않습니다.
+- **접수 확인 대기**: `submit_send` 가 409 `J_41_23_4_5`(`pending`)를 돌려주거나 `get_campaign` 에 `pendingOperation` 이 있으면, 같은 `operationUuid`·`confirmHash`·`idempotencyKey` 로 다시 호출해 결과를 받으세요. 키를 잃었거나 `UNKNOWN` 이라 값이 없으면 새 키로 보내지 말고 `get_campaign` 으로 상태만 다시 확인합니다.
+- **확정값 발송**: 예약 발송을 포함해 실제 발송은 `submit_send` 때 확정한 받는 사람(번호·이름)과 개인화 값으로 나갑니다. 그 뒤 연락처를 바꿔도 이미 확정한 발송 내용은 바뀌지 않습니다.
 - **수신자 제한**: 발송 대상은 `commit_recipients` 로 서버에 등록된 캠페인 대상뿐이며, 전화번호를 발송 요청에 직접 넣을 수 없습니다.
 - **서버 정책 동일 적용**: 스팸·금지 업종 차단, 수신거부 문구 자동 삽입, 광고성 메시지의 수신 동의 확인, 광고·쿠폰 메시지의 야간(21:00~08:00) 즉시 발송 금지(다음 날 08:00 예약 제안), 1000자 제한, 잔액·발송 한도 검사.
 - **사후 확인**: 발송되면 스페이스 관리자에게 바로 알림이 가고, 예약 발송은 `cancel_scheduled_send` 나 웹에서 취소할 수 있습니다.
