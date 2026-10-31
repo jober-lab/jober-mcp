@@ -88,6 +88,16 @@ describe('원격 jober MCP 프록시', () => {
     }
   });
 
+  it('instructions 는 확인 해시·멱등키 계약을 안내하고 사람 승인 의무를 두지 않는다(D6)', async () => {
+    const client = await open(remote.url);
+    const instructions = client.getInstructions() ?? '';
+    expect(instructions).toContain('prepare_send');
+    expect(instructions).toContain('confirmHash');
+    expect(instructions).toContain('idempotencyKey');
+    expect(instructions).toContain('별도의 사람 승인 단계는 없습니다');
+    expect(instructions).not.toMatch(/사용자가 확인하면|명시적 확인|show the summary to the user|explicit user confirmation/);
+  });
+
   it('tools/call 인자와 structuredContent 를 그대로 전달한다', async () => {
     const client = await open(remote.url);
     const args = { campaignUuid: 'c-1', slots: { 금액: '5,000원' } };

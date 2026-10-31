@@ -15,7 +15,7 @@
 - 캠페인 수정 (발송명, 변수 값, 서식 변경)
 - 설문 랜딩 페이지 생성 또는 기존 설문 선택
 - 연락처 목록 미리보기와 등록 (전화번호 정규화, 중복 제거, 개인화 변수 연결)
-- 발송 준비(대상 수, 예상 비용, 미리보기 확인) 후 발송 또는 예약
+- 발송 준비(대상 수, 예상 비용, 미리보기, 확인값 발급) 후 발송 또는 예약
 - 예약 발송 취소, 발송 결과(전달·열람·응답) 조회, 미열람·미응답자 재알림 준비
 
 ## 준비물
@@ -153,7 +153,7 @@ OAuth 대신 API 키를 쓰려면 `Authorization: Bearer jbr_live_xxxxxxxx` 헤�
 
 실제 비용이 드는 발송은 웹과 같은 규칙으로 서버가 검사합니다. 이 패키지는 요청을 전달만 하므로 우회할 수 없습니다.
 
-- **2단계 발송**: `prepare_send` 가 대상 수·예상 비용·렌더된 미리보기와 `operationUuid`·`confirmHash` 를 돌려줍니다. `submit_send` 는 이 값이 있어야 하고, 준비 이후 대상·본문·서식·비용이 바뀌었으면 거부되어 다시 준비해야 합니다. AI 에게는 준비 결과를 사용자에게 보여 주고 확인을 받은 뒤 발송하도록 안내합니다.
+- **2단계 발송**: `prepare_send` 가 대상 수·예상 비용·렌더된 미리보기와 `operationUuid`·`confirmHash` 를 돌려줍니다. `submit_send` 는 이 값과 새 `idempotencyKey` 로 호출하며, 준비 이후 대상·본문·서식·비용이 바뀌었으면 거부되어 다시 준비해야 합니다. 별도의 사람 승인 단계는 없고, 발송 가능 여부는 아래 서버 정책으로 판단합니다(자동화 워크플로에서도 그대로 동작).
 - **멱등 키**: `submit_send` 는 `idempotencyKey` 가 필수이며, 같은 키로 다시 호출해도 한 번만 발송됩니다. 이 패키지는 실패한 호출을 자동 재시도하지 않습니다.
 - **수신자 제한**: 발송 대상은 `commit_recipients` 로 서버에 등록된 캠페인 대상뿐이며, 전화번호를 발송 요청에 직접 넣을 수 없습니다.
 - **서버 정책 동일 적용**: 스팸·금지 업종 차단, 수신거부 문구 자동 삽입, 광고성 메시지의 수신 동의 확인, 광고·쿠폰 메시지의 야간(21:00~08:00) 즉시 발송 금지(다음 날 08:00 예약 제안), 1000자 제한, 잔액·발송 한도 검사.
@@ -194,7 +194,7 @@ response results. It has no business logic of its own: it proxies `tools/list` a
 - **Remote (OAuth)**: clients that support remote MCP can connect to `https://api.jober.io/mcp` directly and sign in with OAuth 2.1 (PKCE).
 - **Env vars**: `JOBER_API_KEY` (required), `JOBER_API_BASE` (default `https://api.jober.io`, https only except localhost).
 - **Tools**: the 16 tools listed above (campaign conversion and editing, templates, surveys, recipients, send, cancel, results, reminders).
-- **Send safety**: two-step `prepare_send` then `submit_send` with a confirm hash and a required idempotency key, recipients
+- **Send safety**: two-step `prepare_send` then `submit_send` with a confirm hash and a required idempotency key (no separate human approval step), recipients
   limited to those committed on the server, the same server-side policies as the web app (spam blocking, opt-out text,
   ad consent, no ad sends between 21:00 and 08:00 KST, 1000-character limit, balance and send limits), instant admin
   notification and cancellable scheduled sends. The proxy never retries failed calls automatically.

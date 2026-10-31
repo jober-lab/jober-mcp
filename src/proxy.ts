@@ -16,9 +16,10 @@ export const SERVER_NAME = 'jober-mcp';
 
 const INSTRUCTIONS = [
   'jober(자버) 카카오 알림톡 캠페인 도구입니다. 문자 원문을 알림톡 캠페인으로 변환하고, 설문 랜딩·수신자 등록·발송·결과 조회를 합니다.',
-  '실제 발송은 반드시 prepare_send 로 대상 수·예상 비용·미리보기를 사용자에게 보여 준 뒤, 사용자가 확인하면 submit_send 를 호출하세요.',
-  'submit_send 에는 prepare_send 가 돌려준 operationUuid·confirmHash 와 새 idempotencyKey 가 필요하며, 같은 키로 다시 호출해도 한 번만 발송됩니다.',
-  'Jober KakaoTalk campaign tools. Always call prepare_send and show the summary to the user before submit_send.',
+  '발송은 2단계입니다. prepare_send 가 대상 수·예상 비용·야간 제한·미리보기와 operationUuid·confirmHash 를 돌려주면, 그 operationUuid·confirmHash 와 새 idempotencyKey 로 submit_send 를 호출하세요.',
+  '별도의 사람 승인 단계는 없습니다. 준비 이후 대상·본문·서식·비용이 바뀌면 서버가 submit_send 를 거부하고(다시 prepare_send), 스팸·수신 동의·야간·잔액·발송 한도도 서버 정책으로 검사합니다. 같은 idempotencyKey 로 다시 호출해도 한 번만 발송됩니다.',
+  'Jober KakaoTalk campaign tools. Sending is two-step: call prepare_send, then submit_send with its operationUuid and confirmHash plus a fresh idempotencyKey. ' +
+    'There is no separate human approval step; the server rejects stale confirm hashes and enforces spam, consent, quiet-hour, balance and send-limit policies.',
 ].join('\n');
 
 /** 원격이 JSON-RPC 오류로 응답한 경우(툴 인자 오류 등). 그대로 전달한다. */
