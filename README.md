@@ -139,14 +139,14 @@ OAuth 대신 API 키를 쓰려면 `Authorization: Bearer jbr_live_xxxxxxxx` 헤�
 | `list_surveys` | 랜딩으로 붙일 수 있는 기존 설문과 공유 링크 목록 | `campaign:read` |
 | `generate_survey` | 설문 랜딩 페이지 생성 작업 시작(`needQuestions: true` 면 응답을 받는 질문까지 생성, 기본은 안내 페이지) | `survey:write` |
 | `select_survey` | 기존 설문(또는 공유 링크)을 랜딩으로 연결하거나 해제 | `survey:write` |
-| `get_job` | 설문 생성 작업 진행 상태 조회 | `campaign:read` |
+| `get_job` | 설문 생성 작업 진행 상태 조회(CANCELED 는 웹에서 취소했거나 생성 중 내용이 바뀌어 결과를 버린 경우) | `campaign:read` |
 | `preview_recipients` | 연락처 목록 검증 미리보기(유효·중복·기존 연락처·수신거부 수) | `contacts:write` |
 | `commit_recipients` | 연락처 등록과 발송 대상 지정, 개인화 변수 연결 | `contacts:write` |
-| `prepare_send` | 발송 준비: 대상 수, 예상 비용, 야간 제한, 미리보기, 확인값 발급 | `send:execute` |
+| `prepare_send` | 발송 준비: 대상 수, 예상 비용, 야간 제한, 미리보기, 확인값 발급(`revision` 을 넘기면 그사이 내용이 바뀐 경우 409 로 알림) | `send:execute` |
 | `submit_send` | 준비된 발송을 실행 또는 예약 | `send:execute` |
 | `cancel_scheduled_send` | 예약 발송 취소 | `send:execute` |
 | `get_campaign_results` | 발송 결과(전달·문자 대체·실패·열람·응답) 조회 | `campaign:read` |
-| `prepare_reminder` | 미열람·미응답자 대상 재알림 캠페인 준비 | `campaign:write` |
+| `prepare_reminder` | 미열람·미응답자 대상 재알림 캠페인 준비(아직 보내지 않은 같은 재알림이 있으면 새로 만들지 않고 `reused: true` 로 돌려줌) | `campaign:write` |
 | `list_campaigns` | 최근 캠페인 목록 | `campaign:read` |
 
 ## 발송 안전장치
