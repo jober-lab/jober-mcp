@@ -1,0 +1,44 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.jober-lab/jober-mcp",
+  "title": "Jober",
+  "description": "Turn text messages into KakaoTalk AlimTalk campaigns, add recipients, send and track results.",
+  "websiteUrl": "https://jober.io/developers/mcp",
+  "repository": {
+    "url": "https://github.com/jober-lab/jober-mcp",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@joberhr/jober-mcp",
+      "version": "0.1.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "JOBER_API_KEY",
+          "description": "Jober API key (jbr_live_...). Create one at https://jober.io/settings/integrations",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "JOBER_API_BASE",
+          "description": "Jober API base URL. The proxy connects to <base>/mcp.",
+          "isRequired": false,
+          "default": "https://api.jober.io"
+        }
+      ]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://api.jober.io/mcp"
+    }
+  ]
+}

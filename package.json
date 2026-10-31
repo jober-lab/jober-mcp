@@ -1,0 +1,48 @@
+{
+  "name": "@joberhr/jober-mcp",
+  "version": "0.1.0",
+  "description": "Jober MCP server (stdio): proxies the remote Jober MCP for KakaoTalk campaign conversion, surveys, recipients, sending and results.",
+  "mcpName": "io.github.jober-lab/jober-mcp",
+  "type": "module",
+  "bin": {
+    "jober-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "server.json"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
+    "test": "npm run typecheck && npm run build && vitest run",
+    "prepublishOnly": "npm run test"
+  },
+  "keywords": [
+    "mcp",
+    "modelcontextprotocol",
+    "jober",
+    "kakao",
+    "alimtalk",
+    "claude"
+  ],
+  "author": "Jober",
+  "license": "MIT",
+  "homepage": "https://jober.io/developers/mcp",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}
