@@ -21,7 +21,7 @@
 ## 준비물
 
 - Node.js 18 이상
-- 자버 API 키: [https://jober.io/settings/integrations](https://jober.io/settings/integrations) (설정 > 연동)에서 발급합니다.
+- 자버 API 키: [https://jober.io/settings/integrations](https://jober.io/settings/integrations) (설정 > AI 도구 연동)에서 발급합니다.
   키(`jbr_live_...`)는 발급 직후 한 번만 보이므로 안전한 곳에 보관하세요. 필요 없어진 키는 같은 화면에서 바로 폐기할 수 있습니다.
 
 ## 설치
@@ -103,7 +103,7 @@ claude mcp add jober -e JOBER_API_KEY=jbr_live_xxxxxxxx -- npx -y @joberhr/jober
 처음 연결할 때 브라우저에서 자버 로그인과 권한 동의 화면이 열리고, 허용하면 OAuth 2.1(PKCE) 토큰으로 연결됩니다.
 claude.ai·ChatGPT 의 사용자 지정 커넥터에도 같은 주소를 넣으면 됩니다.
 
-연결을 끊으려면 자버 웹의 **설정 > 연동 > 연결된 AI 도구**에서 해당 앱의 [연결 끊기]를 누르세요. 끊는 즉시 그 연결의 토큰이 모두 폐기되어 이후 호출은 401 이 됩니다. API 키는 같은 화면의 API 키 목록에서 폐기합니다.
+연결을 끊으려면 자버 웹의 **설정 > AI 도구 연동**의 연결된 AI 도구 목록에서 해당 앱의 [연결 끊기]를 누르세요. 끊는 즉시 그 연결의 토큰이 모두 폐기되어 이후 호출은 401 이 됩니다. API 키는 같은 화면의 API 키 목록에서 폐기합니다.
 
 ```bash
 # Claude Code
@@ -161,7 +161,7 @@ OAuth 대신 API 키를 쓰려면 `Authorization: Bearer jbr_live_xxxxxxxx` 헤�
 - **수신자 제한**: 발송 대상은 `commit_recipients` 로 서버에 등록된 캠페인 대상뿐이며, 전화번호를 발송 요청에 직접 넣을 수 없습니다.
 - **서버 정책 동일 적용**: 스팸·금지 업종 차단, 수신거부 문구 자동 삽입, 광고성 메시지의 수신 동의 확인, 광고·쿠폰 메시지의 야간(21:00~08:00) 즉시 발송 금지(다음 날 08:00 예약 제안), 1000자 제한, 잔액·발송 한도 검사.
 - **사후 확인**: 발송되면 스페이스 관리자에게 바로 알림이 가고, 예약 발송은 `cancel_scheduled_send` 나 웹에서 취소할 수 있습니다.
-- **키 관리**: 키는 매니저 개인에게 귀속되고 서버에는 해시로만 저장됩니다. 의심되면 [연동 설정](https://jober.io/settings/integrations)에서 즉시 폐기하세요. 이 패키지는 키를 환경 변수로만 받고 https 로만 보냅니다.
+- **키 관리**: 키는 매니저 개인에게 귀속되고 서버에는 해시로만 저장됩니다. 의심되면 [설정 > AI 도구 연동](https://jober.io/settings/integrations)에서 즉시 폐기하세요. 이 패키지는 키를 환경 변수로만 받고 https 로만 보냅니다.
 
 ## 문제 해결
 
