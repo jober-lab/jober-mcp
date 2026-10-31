@@ -137,7 +137,7 @@ OAuth 대신 API 키를 쓰려면 `Authorization: Bearer jbr_live_xxxxxxxx` 헤�
 | `update_campaign` | 발송명·변수 값·서식·정보성/광고성 선택 수정 | `campaign:write` |
 | `list_templates` | 사용할 수 있는 알림톡 서식 목록 | `campaign:read` |
 | `list_surveys` | 랜딩으로 붙일 수 있는 기존 설문과 공유 링크 목록 | `campaign:read` |
-| `generate_survey` | 설문 랜딩 페이지 생성 작업 시작 | `survey:write` |
+| `generate_survey` | 설문 랜딩 페이지 생성 작업 시작(`needQuestions: true` 면 응답을 받는 질문까지 생성, 기본은 안내 페이지) | `survey:write` |
 | `select_survey` | 기존 설문(또는 공유 링크)을 랜딩으로 연결하거나 해제 | `survey:write` |
 | `get_job` | 설문 생성 작업 진행 상태 조회 | `campaign:read` |
 | `preview_recipients` | 연락처 목록 검증 미리보기(유효·중복·기존 연락처·수신거부 수) | `contacts:write` |
