@@ -140,7 +140,7 @@ OAuth 대신 API 키를 쓰려면 `Authorization: Bearer jbr_live_xxxxxxxx` 헤�
 | 툴 | 하는 일 | 권한(scope) |
 |---|---|---|
 | `get_send_readiness` | 처음에 한 번: 카카오 채널 연동(미연동이면 `channel.connectUrl`), 쓸 수 있는 기능, 야간 여부, 권한, 막힌 이유(`blockers`) | `campaign:read` |
-| `draft_send` | 권장 시작점. 원문 변환 + `link.url` 이면 버튼에 내 링크 + `landing` 이면 페이지 생성 시작 + `recipients` 면 명단 확인·조건부 저장. 발송은 안 함. `requestKey` 로 재시도해도 캠페인 하나(`reused: true`, 내용이 다르면 409 `J_41_21_4_5`) | `campaign:write`(+링크·생성 `survey:write`, 명단 `contacts:write`) |
+| `draft_send` | 권장 시작점. 원문 변환 + `link.url` 이면 버튼에 내 링크 + `landing` 이면 페이지 생성 시작 + `recipients` 면 명단 확인·조건부 저장. 발송은 안 함. `requestKey` 로 재시도해도 캠페인 하나(`reused: true`, 내용이 다르면 409 `J_41_21_4_5`). `link.url` 과 `landing` `GENERATE_*`·`NONE` 을 함께 주면 400 `J_41_21_1_6` | `campaign:write`(+링크·생성 `survey:write`, 명단 `contacts:write`) |
 | `answer_questions` | `guide.questions` 답을 한 번에 적용(성격, 빈 값, 링크, 명단 순). 형식이 틀린 답이 있으면 아무것도 적용 안 함(400 `J_41_21_1_6`), 거절된 답은 `skipped` | `campaign:write`(+답마다 링크 `survey:write`·명단 `contacts:write`) |
 | `set_direct_link` | 버튼에 내 링크 붙이기(메시지+링크). 자버 공유 링크면 공유 페이지로 바꾸고 `convertedTo: "SELECT_SHARE"` | `survey:write` |
 | `convert_message` | 문자 원문을 알림톡 캠페인 초안으로 변환(링크·명단까지 한 번에 하려면 `draft_send`) | `campaign:write` |
@@ -195,8 +195,9 @@ OAuth 대신 API 키를 쓰려면 `Authorization: Bearer jbr_live_xxxxxxxx` 헤�
 - **링크 없이 보내기**: `select_survey` 의 `NONE` 은 같은 템플릿의 버튼 없는 변형으로 바꿔 보냅니다. 버튼 없는 변형이 없는 템플릿(`get_campaign` 의 `noLinkAvailable: false`)은 `NONE` 이 400 `J_41_22_1_11` 이니 연결할 링크를 골라 주세요.
 - **개인화 변수 연결(재확정)**: `commit_recipients` 의 변수 연결은 매번 그 요청의 `customColumnMap` 기준으로 다시 정해집니다. 명단을 다시 확정할 때 기존 연결을 유지하려면 같은 칸에 `variable` 을 다시 지정하세요. `variable` 을 빼거나 그 칸을 빼면 연결이 풀리고(`unboundVariables`) 값을 다시 묻습니다.
 - **수신자 제한**: 발송 대상은 `commit_recipients` 로 서버에 등록된 캠페인 대상뿐이며, 전화번호를 발송 요청에 직접 넣을 수 없습니다.
-- **야간 자동 예약**: 광고·쿠폰 메시지는 21:00~08:00(KST)에 보낼 수 없습니다. 이 시간에 `prepare_send` 를 부르면 묻지 않고 다음 08:00 으로 예약하고(예약 시각이 이 시간 안이면 그 뒤 첫 08:00) `summary.adjustments`(`QUIET_HOURS_RESCHEDULED`)로 알려 줍니다. 그대로 `submit_send` 하면 예약됩니다. 옮긴 날이 사용기한보다 뒤면 400 `J_41_23_1_11`, 같은 날이면 경고 `EXPIRY_SAME_DAY`.
-- **카카오 채널 연동 필수**: AI 도구 발송은 내 카카오 채널로만 보냅니다. 미연동이면 `prepare_send` 가 400 `J_41_23_1_10`(`data.connectUrl`).
+- **야간 자동 예약**: 광고·쿠폰 메시지는 21:00~08:00(KST)에 보낼 수 없습니다. 이 시간에 `prepare_send` 를 부르면 묻지 않고 다음 08:00 으로 예약하고(예약 시각이 이 시간 안이면 그 뒤 첫 08:00) `summary.adjustments`(`QUIET_HOURS_RESCHEDULED`)로 알려 줍니다. 그대로 `submit_send` 하면 예약됩니다. 옮긴 날이 사용기한보다 뒤면 400 `J_41_23_1_11`, 같은 날이면 경고 `EXPIRY_SAME_DAY`. 지금 보내기로 준비했는데 `submit_send` 시점이 야간이면 400 `J_41_23_1_2`(`data.needsPrepare: true`)이니 `prepare_send` 를 다시 부르면 08:00 자동 예약이 됩니다.
+- **카카오 채널 연동 필수**: AI 도구 발송은 내 카카오 채널로만 보냅니다. 미연동이면 `prepare_send` 가 400 `J_41_23_1_10`(`data.connectUrl`). 준비 뒤 연동이 풀리면 `submit_send` 도 같은 400.
+- **연쇄 변경 중단**: `draft_send`·`answer_questions` 도중 다른 요청이 캠페인을 바꾸면 성공 응답 안에서 남은 단계만 멈추고 `skipped`·`failedSteps` 에 `J_41_21_4_2` + `data.stoppedBy` 가 남습니다. `get_campaign` 으로 최신 상태를 보고 다시 답하세요.
 - **수신거부 링크 기본 켬**: 정보성 안내까지 기본으로 붙습니다. 정보성만 `update_campaign` 의 `optOutLink: false` 로 끌 수 있습니다. 붙일 수 없는 템플릿이면 경고 `OPT_OUT_UNAVAILABLE`.
 - **서버 정책 동일 적용**: 스팸·금지 업종 차단, 광고성 메시지의 수신 동의 확인(`SEND_BASIS`), 1000자 제한, 잔액·발송 한도 검사.
 - **사후 확인**: 발송되면 스페이스 관리자에게 바로 알림이 가고, 예약 발송은 `cancel_scheduled_send` 나 웹에서 취소할 수 있습니다.
@@ -211,7 +212,9 @@ OAuth 대신 API 키를 쓰려면 `Authorization: Bearer jbr_live_xxxxxxxx` 헤�
 | `권한이 없습니다(HTTP 403)` | 키 권한(scope)과 스페이스의 MCP 사용 설정 확인. 계정·IP 차단이면 `J_41_25_3_4`, 연락처 보기·수정 권한이 없으면 `J_41_22_3_1` |
 | `요청이 너무 많습니다(HTTP 429)` | 잠시 후 다시 시도. 설문 생성 하루 한도면 `J_41_22_4_17`(KST 자정 초기화, 그 전에는 `list_surveys` 로 기존 설문 사용), 호출 한도면 `J_41_20_4_2` |
 | `J_41_23_4_5`(409, `pending`) | 접수 결과를 확인하는 중입니다. 같은 `idempotencyKey` 로 잠시 후 다시 호출하면 결과를 돌려받습니다 |
-| `J_41_23_1_10`(400) | 카카오 채널 미연동. `data.connectUrl` 에서 연동한 뒤 `prepare_send` 부터 다시 |
+| `J_41_23_1_10`(400) | 카카오 채널 미연동(준비 뒤 해제되면 `submit_send` 에서도). `data.connectUrl` 에서 연동한 뒤 `prepare_send` 부터 다시 |
+| `J_41_23_1_2`(400, `needsPrepare`) | 지금 보내기로 준비했는데 실행 시점이 야간. `prepare_send` 다시(08:00 자동 예약) |
+| `J_41_23_1_1`(400) | 문구 검사 실패. `data.errors[].code` 가 `PROMOTIONAL_COPY` 면 홍보 표현(연락처 칸 값이면 `count`·`examples`), `BUTTON_TARGET_FIXED` 면 고정 주소 버튼 템플릿 |
 | `J_41_23_1_11`(400) | 보내는 날이 사용기한보다 뒤. `update_campaign` 으로 사용기한을 고치기 |
 | `J_41_22_1_12`~`J_41_22_1_15`(400) | 내 링크를 붙일 수 없음(주소 형식·고정 주소 템플릿·스팸 판정·검사 내용 초과). 다른 링크를 넣거나 안내 페이지 생성(`GENERATE_INFO`) |
 | `엔드포인트를 찾을 수 없습니다(HTTP 404)` | `JOBER_API_BASE` 값 확인 |
