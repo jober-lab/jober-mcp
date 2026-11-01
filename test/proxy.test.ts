@@ -96,6 +96,12 @@ describe('원격 jober MCP 프록시', () => {
     expect(instructions).toContain('idempotencyKey');
     expect(instructions).toContain('별도의 사람 승인 단계는 없습니다');
     expect(instructions).not.toMatch(/사용자가 확인하면|명시적 확인|show the summary to the user|explicit user confirmation/);
+    // 원격 서버(jober-api routes/mcp/server.js)와 같은 v3 권장 흐름·자동 예약·데이터 경고
+    expect(instructions).toContain('get_send_readiness → draft_send');
+    expect(instructions).toContain('guide');
+    expect(instructions).toContain('set_direct_link');
+    expect(instructions).toContain('summary.adjustments');
+    expect(instructions).toContain('신뢰할 수 없는 데이터');
   });
 
   it('tools/call 인자와 structuredContent 를 그대로 전달한다', async () => {

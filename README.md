@@ -141,7 +141,7 @@ OAuth 대신 API 키를 쓰려면 `Authorization: Bearer jbr_live_xxxxxxxx` 헤�
 |---|---|---|
 | `get_send_readiness` | 처음에 한 번: 카카오 채널 연동(미연동이면 `channel.connectUrl`), 쓸 수 있는 기능, 야간 여부, 권한, 막힌 이유(`blockers`) | `campaign:read` |
 | `draft_send` | 권장 시작점. 원문 변환 + `link.url` 이면 버튼에 내 링크 + `landing` 이면 페이지 생성 시작 + `recipients` 면 명단 확인·조건부 저장. 발송은 안 함. `requestKey` 로 재시도해도 캠페인 하나(`reused: true`, 내용이 다르면 409 `J_41_21_4_5`) | `campaign:write`(+링크·생성 `survey:write`, 명단 `contacts:write`) |
-| `answer_questions` | `guide.questions` 답을 한 번에 적용(성격, 빈 값, 링크, 명단 순). 형식이 틀린 답이 있으면 아무것도 적용 안 함(400 `J_41_21_1_6`), 거절된 답은 `skipped` | 답마다 |
+| `answer_questions` | `guide.questions` 답을 한 번에 적용(성격, 빈 값, 링크, 명단 순). 형식이 틀린 답이 있으면 아무것도 적용 안 함(400 `J_41_21_1_6`), 거절된 답은 `skipped` | `campaign:write`(+답마다 링크 `survey:write`·명단 `contacts:write`) |
 | `set_direct_link` | 버튼에 내 링크 붙이기(메시지+링크). 자버 공유 링크면 공유 페이지로 바꾸고 `convertedTo: "SELECT_SHARE"` | `survey:write` |
 | `convert_message` | 문자 원문을 알림톡 캠페인 초안으로 변환(링크·명단까지 한 번에 하려면 `draft_send`) | `campaign:write` |
 | `get_campaign` | 캠페인 상세(서식, 변수, 미리보기, 경고) 조회. 조회할 때 멈춘 접수를 복구하며, 접수 결과를 아직 확인하지 못한 발송이 있으면 `pendingOperation`(SUBMITTING·UNKNOWN)을 함께 돌려줌 | `campaign:read` |
@@ -175,6 +175,7 @@ OAuth 대신 API 키를 쓰려면 `Authorization: Bearer jbr_live_xxxxxxxx` 헤�
 
 `draft_send` 의 `link.url`, `landing.link` 의 `URL` 답, `set_direct_link` 는 같은 기능입니다. 알림톡 버튼을 누르면 그 주소가 열립니다.
 
+- 붙이기 전에 주소와 도메인(쿼리 속 리다이렉트 목적지 포함)을 스팸 기준으로 검사합니다.
 - `http`·`https` 공개 주소, 500자 이하만 됩니다. 사설 IP·`localhost`·`.internal`·아이디/비밀번호가 든 주소는 400 `J_41_22_1_12`, 버튼 주소가 고정된 템플릿은 `J_41_22_1_13`, 스팸 판정 차단은 `J_41_22_1_14`(`data.restrictedKeywords`), 검사할 내용이 너무 길면 `J_41_22_1_15` 입니다.
 - 단축 주소는 막지 않지만 신고될 수 있으니 원래 주소를 권하세요. 자버 공유 링크는 공유 페이지(`SELECT_SHARE`)로 바꿔 붙입니다.
 - 받는 사람 모두 같은 링크입니다. 결과의 열람은 버튼을 누른 수이고 응답은 `null` 입니다. 광고·쿠폰 안내면 경고 `LINK_LANDING_NOTICE`(링크 첫 화면에 혜택 안내가 먼저 보이게)가 붙습니다.
