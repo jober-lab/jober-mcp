@@ -1,6 +1,6 @@
 {
   "name": "@joberhr/jober-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Jober MCP server (stdio): proxies the remote Jober MCP for KakaoTalk campaign conversion, surveys, recipients, sending and results.",
   "mcpName": "io.github.jober-lab/jober-mcp",
   "type": "module",

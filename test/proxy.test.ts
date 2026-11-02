@@ -102,6 +102,10 @@ describe('원격 jober MCP 프록시', () => {
     expect(instructions).toContain('set_direct_link');
     expect(instructions).toContain('summary.adjustments');
     expect(instructions).toContain('신뢰할 수 없는 데이터');
+    // v4: 채널 연동은 필수가 아니고 한도(limits)·미연동 링크·광고 3명 상한을 안내한다
+    expect(instructions).toContain('get_send_readiness 의 limits');
+    expect(instructions).toContain('3명까지');
+    expect(instructions).not.toContain('카카오 채널 연동이 필요합니다');
   });
 
   it('tools/call 인자와 structuredContent 를 그대로 전달한다', async () => {
