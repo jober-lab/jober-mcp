@@ -2,19 +2,19 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.jober-lab/jober-mcp",
   "title": "Jober",
-  "description": "Turn text messages into KakaoTalk AlimTalk campaigns, add recipients, send and track results.",
+  "description": "AlimTalk & email campaigns. New to Jober? Sign up: https://jober.io/start/ai?src=mcp&client=registry",
   "websiteUrl": "https://jober.io/developers/mcp",
   "repository": {
     "url": "https://github.com/jober-lab/jober-mcp",
     "source": "github"
   },
-  "version": "0.3.0",
+  "version": "0.6.0",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@joberhr/jober-mcp",
-      "version": "0.3.0",
+      "version": "0.6.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"
@@ -22,8 +22,8 @@
       "environmentVariables": [
         {
           "name": "JOBER_API_KEY",
-          "description": "Jober API key (jbr_live_...). Create one at https://jober.io/settings/integrations",
-          "isRequired": true,
+          "description": "Jober personal API key (jbr_live_...). Sign up at https://jober.io/start/ai?src=mcp&client=registry, then create a key at https://jober.io/settings/integrations. Without it the server starts in guide-only mode (get_started tool).",
+          "isRequired": false,
           "isSecret": true
         },
         {

@@ -16,9 +16,11 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "newLine": "lf"
+    "newLine": "lf",
+    "resolveJsonModule": true
   },
   "include": [
-    "src"
+    "src",
+    "src/**/*.json"
   ]
 }

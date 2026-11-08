@@ -11,6 +11,8 @@ import { createProxyServer, type ProxyServer } from '../src/proxy.js';
 import { CONTRACT_TOOLS, startMockRemote, VALID_KEY, type MockRemote } from './mockRemote.js';
 
 const VERSION = '0.0.0-test';
+// 가입 링크(MCP 유입 표식, client=local). 오픈 리다이렉트가 없는 고정 경로.
+const SIGNUP_URL = 'https://jober.io/start/ai?src=mcp&client=local';
 const ENTRY = fileURLToPath(new URL('../dist/index.js', import.meta.url));
 
 async function connectLocal(apiBase: string, apiKey = VALID_KEY): Promise<{ client: Client; proxy: ProxyServer }> {
@@ -105,7 +107,94 @@ describe('원격 jober MCP 프록시', () => {
     // v4: 채널 연동은 필수가 아니고 한도(limits)·미연동 링크·광고 3명 상한을 안내한다
     expect(instructions).toContain('get_send_readiness 의 limits');
     expect(instructions).toContain('3명까지');
+    // fix5(M7): 3명 상한은 스페이스 누적(발송을 나눠도 합산)
+    expect(instructions).toContain('외부 링크·광고는 스페이스 누적 3명');
+    expect(instructions).toContain('외부 링크·광고 쿠폰 알림톡은 스페이스 누적 3명까지입니다(발송을 나눠도 합산)');
     expect(instructions).not.toContain('카카오 채널 연동이 필요합니다');
+    // v5(PLAN-v5 D-6, api-onboarding 확정본): 맨 앞 '처음 쓰는 사용자' 절, 채널 3종, 이메일 channel, 잔액 부족 안내
+    expect(instructions.indexOf('처음 쓰는 사용자')).toBe(0);
+    expect(instructions).toContain('onboarding.nextStep');
+    expect(instructions).toContain('이메일(가입 후 바로 시작');
+    // fix1(C1, A안): 이메일·알림톡 체험 10건 합산, 충전해도 늘지 않음, 넘기려면 연동 + 충전, 인원 기준 capacity
+    expect(instructions).toContain('알림톡과 합쳐 체험 10건');
+    expect(instructions).toContain('충전해도 늘지 않으며');
+    expect(instructions).toContain('카카오 채널 연동과 충전이 모두 필요합니다');
+    expect(instructions).toContain('channels[EMAIL].quota');
+    expect(instructions).toContain('channels[].capacity');
+    expect(instructions).toContain('guide.stage 기준');
+    // v6.1(CONTRACTS.md 11-7): 문자는 정보성만, 오너 플로우(몇 초 안내·미리보기·테스트 발송), 정보성 메일 표기, explanation.why
+    expect(instructions).toContain('문자(정보성 안내만');
+    expect(instructions).toContain('묻지 말고 진행하세요');
+    expect(instructions).toContain('템플릿을 찾는 데 몇 초 걸려요');
+    expect(instructions).toContain('preview.previewUrl');
+    expect(instructions).toContain('send_test');
+    expect(instructions).toContain('정보성 이메일에는 (광고)·보낸 곳을 넣지 않습니다');
+    expect(instructions).toContain('explanation.why');
+    expect(instructions).not.toContain('ask the user when the channel is not decided');
+    expect(instructions).toContain('channels[].available');
+    expect(instructions).toContain('channel:"EMAIL"');
+    expect(instructions).toContain('(광고)');
+    expect(instructions).toContain('야간 자동 예약 없음');
+    expect(instructions).toContain('J_41_23_1_14');
+    expect(instructions).toContain('data.prepaidUrl');
+    expect(instructions).toContain('channels[KAKAO].setup');
+    expect(instructions).toContain('카카오 알림톡·이메일 발송 도구입니다');
+    // fix2(R2-1): 야간 규칙은 채널별, 광고성 알림톡만 08:00 자동 예약, 정보성 알림톡·이메일(광고성 포함)은 즉시
+    expect(instructions).toContain('야간 규칙은 채널별입니다: 광고성 알림톡만 KST 21:00~08:00');
+    expect(instructions).toContain('정보성 알림톡과 이메일(광고성 포함)은 야간에도 자동 예약 없이 바로 보냅니다');
+    expect(instructions).toContain('quietHours.channels');
+    expect(instructions).toContain('emails are sent immediately');
+    // fix4(R3-11): 자동 예약 시각 표현 통일
+    expect(instructions).toContain('예약 시각 이후 첫 08:00(KST)');
+  });
+
+  it('instructions 는 원격(jober-api routes/mcp/server.js, feature/ai-agent-html-design edit_page) 실제 렌더 값과 바이트 단위로 같다', async () => {
+    // test/fixtures/remote-instructions.txt = 원격 server.js 를 require 해 buildMcpServer 가 넘긴 instructions(ccg-newagent-v5/fix1-api.md 4-2 와 같음)
+    const expected = readFileSync(new URL('./fixtures/remote-instructions.txt', import.meta.url), 'utf8');
+    const client = await open(remote.url);
+    expect(Buffer.from(client.getInstructions() ?? '', 'utf8').equals(Buffer.from(expected, 'utf8'))).toBe(true);
+  });
+
+  it('서버 title 은 원격 SERVER_INFO.title(알림톡·이메일)과 같고 name 은 jober-mcp 그대로다', async () => {
+    // test/fixtures/remote-server-info.json = 원격 server.js SERVER_INFO 실제 값
+    const remoteInfo = JSON.parse(readFileSync(new URL('./fixtures/remote-server-info.json', import.meta.url), 'utf8'));
+    const client = await open(remote.url);
+    expect(client.getServerVersion()?.name).toBe('jober-mcp');
+    expect(client.getServerVersion()?.title).toBe(remoteInfo.title);
+    expect(remoteInfo.title).toContain('알림톡·이메일');
+  });
+
+  it('MCP 꺼짐(403 J_41_25_3_1)은 원격 본문과 같은 뜻으로 준비 중·웹 사용을 안내한다', async () => {
+    const client = await open(remote.url);
+    remote.forceStatus = 403;
+    remote.forceBody = {
+      errorCode: 'J_41_25_3_1',
+      message: 'MCP 연결이 아직 열려 있지 않습니다.',
+      jober: {
+        message: '자버 AI 에이전트 연결은 아직 준비 중이에요. 웹(jober.io)에서 먼저 써 보실 수 있어요.',
+        webUrl: 'https://evil.example/ai/kakao/infotalk',
+        docsUrl: 'https://jober.io/developers/mcp',
+      },
+    };
+    const result = await client.callTool({ name: 'list_campaigns', arguments: {} });
+    expect(result.isError).toBe(true);
+    const text = firstText(result);
+    expect(text).toContain('HTTP 403');
+    expect(text).toContain('J_41_25_3_1');
+    expect(text).toContain('자버 AI 에이전트 연결은 아직 준비 중이에요');
+    expect(text).toContain('https://jober.io/ai/kakao/infotalk');
+    expect(text).toContain('https://jober.io/developers/mcp');
+    // 링크는 고정값만 쓰고 원격 본문의 주소를 옮기지 않는다
+    expect(text).not.toContain('evil.example');
+  });
+
+  it('그 밖의 403(권한·차단)은 지금처럼 권한·사용 설정 확인을 안내한다', async () => {
+    const client = await open(remote.url);
+    remote.forceStatus = 403;
+    remote.forceBody = { errorCode: 'J_41_25_3_4', message: '차단된 계정입니다.' };
+    const text = firstText(await client.callTool({ name: 'list_campaigns', arguments: {} }));
+    expect(text).toContain('권한이 없습니다(HTTP 403)');
+    expect(text).not.toContain('준비 중이에요');
   });
 
   it('tools/call 인자와 structuredContent 를 그대로 전달한다', async () => {
@@ -135,16 +224,23 @@ describe('원격 jober MCP 프록시', () => {
     expect((error as McpError).message).toContain('Unknown tool: delete_everything');
   });
 
-  it('잘못된 키(401)는 키 발급 위치와 함께 명확한 오류를 준다', async () => {
-    const client = await open(remote.url, 'jbr_live_WRONG');
+  it('잘못된 키(401)는 키 발급 위치·가입 링크와 함께 명확한 오류를 준다', async () => {
+    // 형식은 맞지만 서버가 모르는(폐기·오타) 키
+    const wrongKey = `jbr_live_${'W'.repeat(32)}`;
+    const client = await open(remote.url, wrongKey);
     const listError = await client.listTools().catch((e: unknown) => e);
     expect(listError).toBeInstanceOf(McpError);
     expect((listError as McpError).message).toContain('HTTP 401');
     expect((listError as McpError).message).toContain(KEY_ISSUE_URL);
+    expect((listError as McpError).message).toContain(SIGNUP_URL);
+    expect((listError as McpError).message).not.toContain(wrongKey);
 
     const result = await client.callTool({ name: 'list_campaigns', arguments: {} });
     expect(result.isError).toBe(true);
     expect(firstText(result)).toContain('HTTP 401');
+    expect(firstText(result)).toContain('가입');
+    expect(firstText(result)).toContain(SIGNUP_URL);
+    expect(firstText(result)).not.toContain(wrongKey);
   });
 
   it('원격 서버가 꺼져 있으면 연결 불가 오류를 준다', async () => {
@@ -213,16 +309,19 @@ describe('bin 엔트리(stdio)', () => {
     }
   });
 
-  it('JOBER_API_KEY 가 없으면 stderr 로 안내하고 종료 코드 1 로 끝난다', () => {
+  it('JOBER_API_KEY 가 없으면 종료하지 않고 안내 전용 모드로 시작한다(stderr 안내, stdout 은 MCP 전용)', () => {
+    // stdin 이 바로 닫히면 서버도 정상 종료(0)한다. 수정 전에는 키가 없어 1 로 끝났다.
     const run = spawnSync(process.execPath, [ENTRY], {
       env: { ...getDefaultEnvironment(), JOBER_API_BASE: remote.url },
       input: '',
       encoding: 'utf8',
+      timeout: 10_000,
     });
-    expect(run.status).toBe(1);
+    expect(run.status).not.toBe(1);
     expect(run.stdout).toBe('');
     expect(run.stderr).toContain('JOBER_API_KEY');
     expect(run.stderr).toContain(KEY_ISSUE_URL);
+    expect(run.stderr).toContain('get_started');
   });
 });
 
@@ -235,5 +334,40 @@ describe('배포 메타데이터', () => {
     expect(server.packages[0].identifier).toBe(pkg.name);
     expect(server.packages[0].version).toBe(pkg.version);
     expect(server.remotes[0]).toEqual({ type: 'streamable-http', url: 'https://api.jober.io/mcp' });
+  });
+
+  it('버전(0.6.0, edit_page)과 가입 링크(client=registry)·이메일 채널을 싣는다', () => {
+    const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+    const server = JSON.parse(readFileSync(new URL('../server.json', import.meta.url), 'utf8'));
+    expect(pkg.version).toBe('0.6.0');
+    expect(server.description).toContain('https://jober.io/start/ai?src=mcp&client=registry');
+    expect(server.description).toMatch(/email/i);
+    // MCP Registry server.schema.json ServerDetail.description maxLength 100
+    expect(server.description.length).toBeLessThanOrEqual(100);
+    // 키가 없어도 안내 모드로 뜨므로 필수가 아니다
+    expect(server.packages[0].environmentVariables[0]).toMatchObject({ name: 'JOBER_API_KEY', isRequired: false, isSecret: true });
+    const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+    expect(readme).toContain('https://jober.io/start/ai?src=mcp&client=local');
+    expect(readme).toContain('처음이세요?');
+    expect(readme).toContain('get_started');
+    // fix1(A안): 이메일·알림톡 체험 10건 합산, 충전해도 연동 전에는 10건을 넘지 못함
+    const firstTime = readme.slice(readme.indexOf('처음이세요?'), readme.indexOf('[English summary]'));
+    expect(firstTime).toContain('이메일과 알림톡을 합쳐 체험 10건');
+    expect(firstTime).toContain('충전해도 늘지 않습니다');
+    const emailRow = readme.split('\n').find((line) => line.startsWith('| 이메일 | `EMAIL`')) ?? '';
+    expect(emailRow).toContain('알림톡과 합쳐 체험 10건');
+    expect(emailRow).toContain('충전해도 늘지 않으며');
+    // fix2: 채널별 야간 규칙(광고성 알림톡만 08:00 자동 예약, 이메일은 야간에도 즉시)과 서버 표시 이름
+    expect(readme).toContain('광고성 알림톡만 밤 9시~아침 8시(한국 시간)에 보내지 않고');
+    // fix4: 예약 시각 표현 통일, 이메일은 늘 EMAIL_NIGHT_ALLOWED
+    expect(readme).toContain('예약 시각 이후 첫 08:00(한국 시간)으로 자동 예약해요');
+    expect(readme).toContain('이메일 prepare_send 에는 늘 EMAIL_NIGHT_ALLOWED 안내가 붙어요');
+    expect(readme).not.toContain('다음 08:00');
+    // fix5: 3명 상한은 스페이스 누적
+    const kakaoRow = readme.split('\n').find((line) => line.startsWith('| 카카오 알림톡 | `KAKAO`')) ?? '';
+    expect(kakaoRow).toContain('스페이스 누적 3명까지(발송을 나눠도 합산)');
+    expect(readme).not.toContain('받는 사람 3명까지');
+    expect(readme).toContain('정보성 알림톡과 이메일(광고성 포함)은 야간에도 자동 예약 없이 바로 보내요');
+    expect(readme).toContain('Jober (자버) 알림톡·이메일 AI 에이전트');
   });
 });
