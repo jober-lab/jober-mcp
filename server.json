@@ -1,20 +1,20 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.jober-lab/jober-mcp",
-  "title": "Jober",
-  "description": "AlimTalk & email campaigns. New to Jober? Sign up: https://jober.io/start/ai?src=mcp&client=registry",
+  "name": "io.jober/jober-mcp",
+  "title": "Jober (자버) KakaoTalk AlimTalk",
+  "description": "Send KakaoTalk AlimTalk (카카오 알림톡), SMS (문자) and email campaigns in Korea from AI agents",
   "websiteUrl": "https://jober.io/developers/mcp",
   "repository": {
     "url": "https://github.com/jober-lab/jober-mcp",
     "source": "github"
   },
-  "version": "0.6.0",
+  "version": "0.6.1",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@joberhr/jober-mcp",
-      "version": "0.6.0",
+      "version": "0.6.1",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

@@ -336,12 +336,17 @@ describe('배포 메타데이터', () => {
     expect(server.remotes[0]).toEqual({ type: 'streamable-http', url: 'https://api.jober.io/mcp' });
   });
 
-  it('버전(0.6.0, edit_page)과 가입 링크(client=registry)·이메일 채널을 싣는다', () => {
+  it('버전(0.6.1)·io.jober 이름공간·검색 키워드(알림톡)·가입 링크(client=registry)를 싣는다', () => {
     const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
     const server = JSON.parse(readFileSync(new URL('../server.json', import.meta.url), 'utf8'));
-    expect(pkg.version).toBe('0.6.0');
-    expect(server.description).toContain('https://jober.io/start/ai?src=mcp&client=registry');
+    expect(pkg.version).toBe('0.6.1');
+    expect(server.name).toBe('io.jober/jober-mcp');
+    // 0.6.1: description 은 검색 키워드 자리로 쓰고, 가입 링크는 JOBER_API_KEY 설명에만 둔다
+    expect(server.description).toContain('KakaoTalk AlimTalk');
+    expect(server.description).toContain('카카오 알림톡');
     expect(server.description).toMatch(/email/i);
+    expect(server.packages[0].environmentVariables[0].description).toContain('https://jober.io/start/ai?src=mcp&client=registry');
+    expect(pkg.keywords).toEqual(expect.arrayContaining(['alimtalk', 'kakaotalk', '알림톡', 'sms', 'korea', 'mcp']));
     // MCP Registry server.schema.json ServerDetail.description maxLength 100
     expect(server.description.length).toBeLessThanOrEqual(100);
     // 키가 없어도 안내 모드로 뜨므로 필수가 아니다
@@ -351,7 +356,7 @@ describe('배포 메타데이터', () => {
     expect(readme).toContain('처음이세요?');
     expect(readme).toContain('get_started');
     // fix1(A안): 이메일·알림톡 체험 10건 합산, 충전해도 연동 전에는 10건을 넘지 못함
-    const firstTime = readme.slice(readme.indexOf('처음이세요?'), readme.indexOf('[English summary]'));
+    const firstTime = readme.slice(readme.indexOf('처음이세요?'), readme.indexOf('## English summary'));
     expect(firstTime).toContain('이메일과 알림톡을 합쳐 체험 10건');
     expect(firstTime).toContain('충전해도 늘지 않습니다');
     const emailRow = readme.split('\n').find((line) => line.startsWith('| 이메일 | `EMAIL`')) ?? '';
@@ -369,5 +374,10 @@ describe('배포 메타데이터', () => {
     expect(readme).not.toContain('받는 사람 3명까지');
     expect(readme).toContain('정보성 알림톡과 이메일(광고성 포함)은 야간에도 자동 예약 없이 바로 보내요');
     expect(readme).toContain('Jober (자버) 알림톡·이메일 AI 에이전트');
+    // 0.6.1: 검색 노출용 제목·Jobber 구분·영어 요약을 앞쪽에 둔다
+    expect(readme.split('\n')[0]).toContain('카카오 알림톡 MCP 서버 (KakaoTalk AlimTalk MCP)');
+    expect(readme).toContain('It is not Jobber');
+    expect(readme.indexOf('## English summary')).toBeGreaterThan(0);
+    expect(readme.indexOf('## English summary')).toBeLessThan(readme.indexOf('## 할 수 있는 일'));
   });
 });

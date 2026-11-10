@@ -1,20 +1,109 @@
-# @joberhr/jober-mcp
+# Jober (자버) 카카오 알림톡 MCP 서버 (KakaoTalk AlimTalk MCP)
 
-자버(jober) 카카오 알림톡·이메일 캠페인을 Claude, Cursor, VS Code 같은 AI 도구에서 바로 다루는 MCP 서버입니다.
-문자 원문을 붙여 넣으면 알림톡(또는 이메일) 캠페인으로 바꾸고, 버튼에 내 링크나 설문 랜딩을 붙이고, 수신자를 등록하고, 발송과 결과 조회까지 할 수 있습니다.
-서버가 돌려주는 `guide`(물을 질문과 다음에 부를 툴)를 따르면 적은 호출로 끝까지 갈 수 있습니다.
+[![npm](https://img.shields.io/npm/v/@joberhr/jober-mcp?label=npm)](https://www.npmjs.com/package/@joberhr/jober-mcp)
+[![license](https://img.shields.io/npm/l/@joberhr/jober-mcp)](LICENSE)
 
-> **처음이세요?**
-> 1. 자버 계정이 없으면 [https://jober.io/start/ai?src=mcp&client=local](https://jober.io/start/ai?src=mcp&client=local) 에서 직접 가입하세요. 가입하면 바로 이메일·알림톡을 보낼 수 있습니다(가입 보너스 500원으로 약 10건). 다만 카카오 채널을 연동하기 전에는 **이메일과 알림톡을 합쳐 체험 10건**까지이고, **충전해도 늘지 않습니다**. 10건을 넘겨 보내려면 카카오 채널을 연동하고 충전하세요.
-> 2. [설정 > AI 도구 연동](https://jober.io/settings/integrations)에서 개인 API 키(`jbr_live_...`)를 발급해 `JOBER_API_KEY` 에 넣고 MCP 서버를 다시 시작하세요. 키 없이 [원격 URL 을 OAuth 로 연결](#원격-url-직접-연결-oauth)해도 됩니다.
-> 3. 키 없이 먼저 설치해도 됩니다. 키가 없거나 형식이 틀리면 종료하지 않고 [안내 전용 모드](#안내-전용-모드-키가-없을-때)로 떠서 `get_started` 툴 하나로 가입·키 발급·설정 방법을 알려 줍니다.
+**자버 알림톡 MCP 서버는 AI 도구에서 대화로 카카오 알림톡·이메일·문자를 보낼 수 있게 해 주는 연결 도구예요.** Claude, ChatGPT, Cursor, VS Code 에 자버를 연결하고, 보낼 내용과 받는 사람을 알려 주세요.
+
+> "이 문자 내용을 알림톡으로 바꿔서 고객 명단에 보내 줘."
+
+AI 가 메시지를 알림톡이나 이메일 발송에 맞게 준비해요. 버튼에 내 웹페이지나 설문 링크를 넣고, 받는 사람을 등록하고, 발송한 뒤 전달·열람·응답 결과를 확인하는 일까지 대화로 이어 갈 수 있어요.
+
+MCP 가 낯설어도 괜찮아요. AI 도구가 자버의 기능을 쓸 수 있도록 연결하는 방식이라고 생각하면 돼요.
+
+카카오 알림톡은 받는 사람이 채널 친구를 추가하지 않아도 전화번호로 보낼 수 있어요. 월 구독료 없이 필요한 만큼 미리 충전하고, 보낸 건수만큼 차감하는 선불 방식이에요. 발송 비용은 건당 약 50원이에요. 문자(SMS)는 정보성 안내만 보낼 수 있고, 자버 설정에서 문자 발송을 켠 뒤에 쓸 수 있어요.
+
+> Jober (자버, [jober.io](https://jober.io)) is a Korean messaging service for KakaoTalk AlimTalk, email and SMS. It is not Jobber, the field service software.
+
+## 처음이세요?
+
+### 1. 자버에 가입하고 체험해 보세요
+
+자버 계정이 없다면 [자버 가입하기](https://jober.io/start/ai?src=mcp&client=local)에서 직접 가입해 주세요(AI 도구가 계정을 대신 만들 수는 없어요).
+
+가입하면 **보너스 500원으로 약 10건**을 보내 볼 수 있어요. 이메일과 알림톡은 가입 후 바로 이용할 수 있어요.
+
+> **가입 보너스와 체험 한도는 별개예요.**
+>
+> 카카오 채널을 연동하기 전에는 **이메일과 알림톡을 합쳐 체험 10건**까지 보낼 수 있어요. 이 체험 한도는 **충전해도 늘지 않습니다**.
+>
+> 10건을 넘겨 보내려면 **카카오 채널 연동과 충전이 모두 필요해요.**
+
+### 2. 사용 중인 AI 도구에 자버를 연결하세요
+
+연결 방법은 두 가지예요. 쓰는 AI 도구가 원격 MCP 를 지원한다면, 설치 없이 자버 계정으로 로그인하는 방법이 간편해요.
+
+| 연결 방법 | 이렇게 시작하세요 |
+|---|---|
+| **설치 없이 연결하기(OAuth)** | AI 도구의 커넥터 또는 MCP 설정에 `https://api.jober.io/mcp` 를 추가하세요. 열리는 화면에서 자버에 로그인하고 연결을 허용하면 돼요([원격 URL 직접 연결](#원격-url-직접-연결-oauth)). |
+| **내 컴퓨터에서 패키지로 연결하기(API 키)** | `npx -y @joberhr/jober-mcp` 를 MCP 서버 실행 명령으로 등록하세요. 설정의 `JOBER_API_KEY` 에 자버 개인 API 키를 넣으면 돼요([설치](#설치)). |
+
+패키지로 연결한다면 [설정 > AI 도구 연동](https://jober.io/settings/integrations)에서 개인 API 키(`jbr_live_...`)를 발급해 주세요. 키를 `JOBER_API_KEY` 에 넣은 뒤 MCP 서버를 다시 시작하면 돼요.
+
+AI 도구별 설정 방법은 아래 [설치](#설치)와 [자버 개발자 문서: MCP 서버](https://jober.io/developers/mcp)에서 확인할 수 있어요.
+
+### 3. 연결했다면 보낼 내용을 이야기해 주세요
+
+보낼 메시지와 고객 명단을 준비하고, AI 에게 원하는 작업을 부탁해 보세요.
+
+> "이 내용을 고객들에게 알림톡으로 보내고 싶어. 버튼에는 이 설문 링크를 넣어 줘."
+
+발송한 뒤에는 "전달 결과를 알려 줘"처럼 결과 확인도 요청할 수 있어요.
+
+### 아직 API 키가 없어도 안내를 받을 수 있어요
+
+로컬 패키지는 API 키 없이 먼저 실행해도 괜찮아요. 키가 없거나 형식이 맞지 않으면 프로그램을 종료하지 않고 **안내 전용 모드**로 실행돼요.
+
+이때는 `get_started` 툴 하나만 보여요. 이 툴이 가입, 개인 API 키 발급, 연결 설정 방법을 안내해 줘요. 키를 설정하고 MCP 서버를 다시 시작하면 발송에 필요한 툴을 쓸 수 있어요. 자세한 내용은 [안내 전용 모드](#안내-전용-모드-키가-없을-때)를 참고해 주세요.
+
+## English summary
+
+`@joberhr/jober-mcp` is a KakaoTalk AlimTalk (카카오 알림톡) MCP server for [Jober](https://jober.io), a Korean messaging service.
+It connects AI tools such as Claude, ChatGPT, Cursor and VS Code to Jober as a local (stdio) MCP server. It turns text messages into KakaoTalk AlimTalk
+or email campaigns, attaches survey landing pages, imports recipients, sends or schedules campaigns and reports delivery, open and
+response results. It has no business logic of its own: it proxies `tools/list` and `tools/call` to the remote Jober MCP server
+(`https://api.jober.io/mcp`, Streamable HTTP) using your personal API key (`jbr_live_`) as `Authorization: Bearer <JOBER_API_KEY>`.
+Company API keys (`jbr_co_`) are for server integrations (send API, free-send REST) and cannot be used with MCP.
+
+- **New to Jober?** Sign up yourself at https://jober.io/start/ai?src=mcp&client=local (there is no account-creation API), then create a personal API key.
+- **Guide-only mode**: if `JOBER_API_KEY` is missing, malformed or a company key, the server does not exit. It exposes a single
+  `get_started` tool that returns the signup link, where to create the key, how to set it and the remote OAuth alternative
+  (fetched without a key from `<JOBER_API_BASE>/ai-agent/v2/public/getting-started?client=local`, with a bundled offline copy).
+  Set the key and restart the server to get the campaign tools. An invalid `JOBER_API_BASE` still exits with code 1.
+- **Channels**: `EMAIL` (right after signup, prepaid balance) and `KAKAO` (default) via
+  `draft_send`'s `channel`, and `SMS` for informational messages only (50 KRW each, must be enabled in Jober, `channels[SMS]`; ads are rejected with `J_41_21_1_10`). Omit `channel` and the server decides it (`channelDecision`). Check `channels[]` and `onboarding.nextStep` in `get_send_readiness`.
+  Before a Kakao channel is connected, email and AlimTalk share the 10-send trial, and charging does not raise it; connect the channel
+  and charge to send more (see `channels[EMAIL].quota`; pass `targets` to `get_send_readiness` for `channels[].capacity`).
+  Insufficient balance is `J_41_23_1_14` with `data.prepaidUrl`.
+- **Quiet hours**: Only advertising Alimtalk sends in KST 21:00-08:00 are auto-scheduled for the first 08:00 KST after the requested time; informational Alimtalk and all emails are sent immediately. Email prepare_send always includes the EMAIL_NIGHT_ALLOWED notice. See quietHours.channels in get_send_readiness.
+- **Server name**: the MCP server title is `Jober (자버) 알림톡·이메일 AI 에이전트` (same as the remote server); the server name is `jober-mcp`.
+- **API key**: create one at https://jober.io/settings/integrations (shown once; revoke it there at any time).
+- **Install**: `claude mcp add jober -e JOBER_API_KEY=jbr_live_xxxxxxxx -- npx -y @joberhr/jober-mcp`, or use the
+  `npx -y @joberhr/jober-mcp` command with the `JOBER_API_KEY` env var in Claude Desktop, Cursor or VS Code (see [설치](#설치) below).
+- **Remote (OAuth)**: clients that support remote MCP can connect to `https://api.jober.io/mcp` directly and sign in with OAuth 2.1 (PKCE).
+- **Env vars**: `JOBER_API_KEY` (needed for the campaign tools; without it, guide-only mode), `JOBER_API_BASE` (default `https://api.jober.io`, https only except localhost).
+- **Tools**: the 22 tools listed below (including `send_test` for one test recipient before the real send and `edit_page` to change the landing page as the user asks), including `get_send_readiness`, `draft_send` (convert + attach your link + start a landing page + check recipients in one call), `answer_questions` and `set_direct_link` (your own URL on the AlimTalk button, "message+link").
+- **Guide**: results carry `guide` (`stage`, `questions` to ask the user, `nextActions` with prefilled args). Follow it and answer all questions with `answer_questions`.
+- **Kakao channel**: connecting a Kakao channel is recommended but not required. Without one, sends go out through Jober's shared
+  channel under the same limits as the web app (see `limits` in `get_send_readiness`), and external-link or ad-coupon sends are
+  capped at 3 recipients per space in total, summed across sends (`J_41_23_1_13`; email is not affected). A destination without a link-button template is rejected with `J_41_23_4_4`
+  (`NO_BUTTON_TEMPLATE`). If the channel status lookup fails temporarily, `prepare_send`/`submit_send` return
+  a tool error `J_41_23_2_3` (HTTP 200 with `result.isError: true`; HTTP 503 on the REST API) without `needsPrepare`: retry later
+  (for `submit_send`, the same confirm hash; reusing the same idempotency key or a new one are both safe).
+- **Campaign status**: `status` is computed on every read (10 values: DRAFT, NEEDS_INPUT, READY, PREPARED, BLOCKED, SCHEDULED,
+  SENDING, SENT, CANCELED, FAILED). `pendingOperation.status` is only `SUBMITTING`; `UNKNOWN` is no longer returned.
+- **Send safety**: two-step `prepare_send` then `submit_send` with a confirm hash and a required idempotency key (no separate human approval step), recipients
+  limited to those committed on the server, the same server-side policies as the web app (spam blocking, opt-out text,
+  ad consent, quiet hours per channel (only advertising Alimtalk sends prepared between 21:00 and 08:00 KST are rescheduled to the first 08:00 KST after the requested time without asking, while informational Alimtalk and all emails including ads are sent immediately; see `quietHours.channels`) reported in
+  `summary.adjustments`, the opt-out link on by default (only informational campaigns may turn it off), 1000-character limit, balance and send limits), instant admin
+  notification and cancellable scheduled sends. The proxy never retries failed calls automatically.
+
+## 이 패키지가 하는 일
 
 이 패키지는 로컬(stdio) MCP 서버입니다. 자체 로직 없이 자버 원격 MCP 서버(`https://api.jober.io/mcp`, Streamable HTTP)에
 `tools/list`·`tools/call` 을 그대로 전달하고, 인증은 개인 API 키(`Authorization: Bearer <JOBER_API_KEY>`)로 합니다.
 원격 MCP 를 직접 지원하는 클라이언트라면 이 패키지 없이 [원격 URL 로 바로 연결](#원격-url-직접-연결-oauth)해도 됩니다.
 MCP 클라이언트에 보이는 서버 표시 이름(title)은 원격과 같은 `Jober (자버) 알림톡·이메일 AI 에이전트` 이고, 서버 이름(name)은 `jober-mcp` 입니다.
-
-[English summary](#english-summary)
 
 ## 할 수 있는 일
 
@@ -318,47 +407,6 @@ JOBER_API_BASE=http://localhost:4100 node dist/index.js   # 키 없이 실행하
 ```
 
 내장 사본 `src/guide-fallback.json` 은 jober-api 공개 안내(`GET /ai-agent/v2/public/getting-started`) 응답과 같은 모양입니다. 원격 값이 바뀌면 함께 맞추세요.
-
-## English summary
-
-`@joberhr/jober-mcp` is a local (stdio) MCP server for [Jober](https://jober.io). It turns text messages into KakaoTalk AlimTalk
-or email campaigns, attaches survey landing pages, imports recipients, sends or schedules campaigns and reports delivery, open and
-response results. It has no business logic of its own: it proxies `tools/list` and `tools/call` to the remote Jober MCP server
-(`https://api.jober.io/mcp`, Streamable HTTP) using your personal API key (`jbr_live_`) as `Authorization: Bearer <JOBER_API_KEY>`.
-Company API keys (`jbr_co_`) are for server integrations (send API, free-send REST) and cannot be used with MCP.
-
-- **New to Jober?** Sign up yourself at https://jober.io/start/ai?src=mcp&client=local (there is no account-creation API), then create a personal API key.
-- **Guide-only mode**: if `JOBER_API_KEY` is missing, malformed or a company key, the server does not exit. It exposes a single
-  `get_started` tool that returns the signup link, where to create the key, how to set it and the remote OAuth alternative
-  (fetched without a key from `<JOBER_API_BASE>/ai-agent/v2/public/getting-started?client=local`, with a bundled offline copy).
-  Set the key and restart the server to get the campaign tools. An invalid `JOBER_API_BASE` still exits with code 1.
-- **Channels**: `EMAIL` (right after signup, prepaid balance) and `KAKAO` (default) via
-  `draft_send`'s `channel`, and `SMS` for informational messages only (50 KRW each, must be enabled in Jober, `channels[SMS]`; ads are rejected with `J_41_21_1_10`). Omit `channel` and the server decides it (`channelDecision`). Check `channels[]` and `onboarding.nextStep` in `get_send_readiness`.
-  Before a Kakao channel is connected, email and AlimTalk share the 10-send trial, and charging does not raise it; connect the channel
-  and charge to send more (see `channels[EMAIL].quota`; pass `targets` to `get_send_readiness` for `channels[].capacity`).
-  Insufficient balance is `J_41_23_1_14` with `data.prepaidUrl`.
-- **Quiet hours**: Only advertising Alimtalk sends in KST 21:00-08:00 are auto-scheduled for the first 08:00 KST after the requested time; informational Alimtalk and all emails are sent immediately. Email prepare_send always includes the EMAIL_NIGHT_ALLOWED notice. See quietHours.channels in get_send_readiness.
-- **Server name**: the MCP server title is `Jober (자버) 알림톡·이메일 AI 에이전트` (same as the remote server); the server name is `jober-mcp`.
-- **API key**: create one at https://jober.io/settings/integrations (shown once; revoke it there at any time).
-- **Install**: `claude mcp add jober -e JOBER_API_KEY=jbr_live_xxxxxxxx -- npx -y @joberhr/jober-mcp`, or use the
-  `npx -y @joberhr/jober-mcp` command with the `JOBER_API_KEY` env var in Claude Desktop, Cursor or VS Code (snippets above).
-- **Remote (OAuth)**: clients that support remote MCP can connect to `https://api.jober.io/mcp` directly and sign in with OAuth 2.1 (PKCE).
-- **Env vars**: `JOBER_API_KEY` (needed for the campaign tools; without it, guide-only mode), `JOBER_API_BASE` (default `https://api.jober.io`, https only except localhost).
-- **Tools**: the 22 tools listed above (including `send_test` for one test recipient before the real send and `edit_page` to change the landing page as the user asks), including `get_send_readiness`, `draft_send` (convert + attach your link + start a landing page + check recipients in one call), `answer_questions` and `set_direct_link` (your own URL on the AlimTalk button, "message+link").
-- **Guide**: results carry `guide` (`stage`, `questions` to ask the user, `nextActions` with prefilled args). Follow it and answer all questions with `answer_questions`.
-- **Kakao channel**: connecting a Kakao channel is recommended but not required. Without one, sends go out through Jober's shared
-  channel under the same limits as the web app (see `limits` in `get_send_readiness`), and external-link or ad-coupon sends are
-  capped at 3 recipients per space in total, summed across sends (`J_41_23_1_13`; email is not affected). A destination without a link-button template is rejected with `J_41_23_4_4`
-  (`NO_BUTTON_TEMPLATE`). If the channel status lookup fails temporarily, `prepare_send`/`submit_send` return
-  a tool error `J_41_23_2_3` (HTTP 200 with `result.isError: true`; HTTP 503 on the REST API) without `needsPrepare`: retry later
-  (for `submit_send`, the same confirm hash; reusing the same idempotency key or a new one are both safe).
-- **Campaign status**: `status` is computed on every read (10 values: DRAFT, NEEDS_INPUT, READY, PREPARED, BLOCKED, SCHEDULED,
-  SENDING, SENT, CANCELED, FAILED). `pendingOperation.status` is only `SUBMITTING`; `UNKNOWN` is no longer returned.
-- **Send safety**: two-step `prepare_send` then `submit_send` with a confirm hash and a required idempotency key (no separate human approval step), recipients
-  limited to those committed on the server, the same server-side policies as the web app (spam blocking, opt-out text,
-  ad consent, quiet hours per channel (only advertising Alimtalk sends prepared between 21:00 and 08:00 KST are rescheduled to the first 08:00 KST after the requested time without asking, while informational Alimtalk and all emails including ads are sent immediately; see `quietHours.channels`) reported in
-  `summary.adjustments`, the opt-out link on by default (only informational campaigns may turn it off), 1000-character limit, balance and send limits), instant admin
-  notification and cancellable scheduled sends. The proxy never retries failed calls automatically.
 
 ## License
 
