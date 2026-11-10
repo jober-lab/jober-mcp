@@ -1,8 +1,8 @@
 {
   "name": "@joberhr/jober-mcp",
-  "version": "0.6.0",
-  "description": "Jober MCP server (stdio): proxies the remote Jober MCP for KakaoTalk AlimTalk and email campaigns, surveys, recipients, sending and results. Starts in a guide-only mode (get_started) when no API key is set.",
-  "mcpName": "io.github.jober-lab/jober-mcp",
+  "version": "0.6.1",
+  "description": "KakaoTalk AlimTalk (카카오 알림톡) MCP server for Jober (자버): send KakaoTalk AlimTalk, email and SMS (문자) campaigns in Korea from Claude, ChatGPT, Cursor or VS Code. Proxies the remote Jober MCP (https://api.jober.io/mcp) for drafting, surveys, recipients, sending and results. Starts in a guide-only mode (get_started) when no API key is set.",
+  "mcpName": "io.jober/jober-mcp",
   "type": "module",
   "bin": {
     "jober-mcp": "dist/index.js"
@@ -24,16 +24,33 @@
   },
   "keywords": [
     "mcp",
+    "mcp-server",
     "modelcontextprotocol",
+    "model-context-protocol",
     "jober",
     "kakao",
+    "kakaotalk",
     "alimtalk",
+    "kakao-alimtalk",
+    "알림톡",
+    "카카오알림톡",
+    "sms",
     "email",
+    "messaging",
+    "notification",
+    "korea",
     "claude"
   ],
   "author": "Jober",
   "license": "MIT",
   "homepage": "https://jober.io/developers/mcp",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jober-lab/jober-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jober-lab/jober-mcp/issues"
+  },
   "publishConfig": {
     "access": "public"
   },
