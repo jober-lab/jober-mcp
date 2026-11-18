@@ -125,7 +125,8 @@ export function guideInstructions(problem: KeyProblem, mcpb = false): string {
       `get_started 를 호출해 사용자에게 가입과 키 발급 방법을 안내하고, 키를 받으면 ${mcpb ? 'Claude 설정 > 확장 프로그램 > 자버 > 설정의 키 칸' : 'MCP 설정의 JOBER_API_KEY'}에 넣고 다시 시작하라고 알려 주세요. ` +
       '가입과 키 발급은 사용자가 웹에서 직접 합니다. 키 없이 쓰려면 원격 MCP 주소를 OAuth 로 연결하는 방법도 안내할 수 있습니다.',
     'Jober MCP is running in guide-only mode because JOBER_API_KEY is missing or unusable. Call get_started and relay the signup, ' +
-      'API key and setup steps to the user; after they set JOBER_API_KEY, the MCP server must be restarted. Remote MCP with OAuth is an alternative.',
+      `API key and setup steps to the user; after they set ${mcpb ? 'the key in Claude Settings > Extensions > Jober' : 'JOBER_API_KEY'}, ` +
+      'the MCP server must be restarted. Remote MCP with OAuth is an alternative.',
   ].join('\n');
 }
 
@@ -209,14 +210,16 @@ export async function getStartedResult(
 }
 
 /** 안내 모드에서 get_started 가 아닌 툴을 불렀을 때 */
-export function guideOnlyToolError(toolName: string, problem: KeyProblem, detail?: string) {
+export function guideOnlyToolError(toolName: string, problem: KeyProblem, detail?: string, mcpb = false) {
+  const reason = detail ?? (mcpb ? `${describeKeyProblem(problem)} ${MCPB_KEY_HINT}` : describeKeyProblem(problem));
+  const where = mcpb ? 'Claude 설정 > 확장 프로그램 > 자버 > 설정에서 키를 넣고 확장 프로그램을 껐다 켜세요' : 'JOBER_API_KEY 를 설정한 뒤 MCP 서버를 다시 시작하세요';
   return {
     content: [
       {
         type: 'text' as const,
         text:
           `지금은 안내 전용 모드라 ${toolName} 툴을 쓸 수 없습니다. get_started 를 호출해 가입·키 발급 방법을 확인하고, ` +
-          `JOBER_API_KEY 를 설정한 뒤 MCP 서버를 다시 시작하세요. ${detail ?? describeKeyProblem(problem)}`,
+          `${where}. ${reason}`,
       },
     ],
     isError: true,
@@ -234,7 +237,7 @@ export function createGuideServer(config: GuideConfig, version: string, options:
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [GUIDE_TOOL] }));
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    if (request.params.name !== GUIDE_TOOL_NAME) return guideOnlyToolError(request.params.name, config.keyProblem);
+    if (request.params.name !== GUIDE_TOOL_NAME) return guideOnlyToolError(request.params.name, config.keyProblem, undefined, mcpb);
     return getStartedResult(config.gettingStartedUrl, config.keyProblem, options, undefined, mcpb);
   });
 

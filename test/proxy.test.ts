@@ -278,6 +278,9 @@ describe('원격 jober MCP 프록시', () => {
       const text = firstText(await client.callTool({ name: 'get_started', arguments: {} }));
       expect(text).toContain('확장 프로그램 > 자버 > 설정');
       expect(text).not.toContain('claude mcp add');
+      const other = firstText(await client.callTool({ name: 'list_campaigns', arguments: {} }));
+      expect(other).toContain('확장 프로그램 > 자버 > 설정');
+      expect(other).not.toContain('MCP 서버를 다시 시작');
       await client.close();
     }
   });

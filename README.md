@@ -3,7 +3,7 @@
 [![npm](https://img.shields.io/npm/v/@joberhr/jober-mcp?label=npm)](https://www.npmjs.com/package/@joberhr/jober-mcp)
 [![license](https://img.shields.io/npm/l/@joberhr/jober-mcp)](LICENSE)
 
-**자버 알림톡 MCP 서버는 AI 도구에서 대화로 카카오 알림톡·이메일·문자를 보낼 수 있게 해 주는 연결 도구예요.** Claude, ChatGPT, Cursor, VS Code 에 자버를 연결하고, 보낼 내용과 받는 사람을 알려 주세요.
+**자버 알림톡 MCP 서버는 AI 도구에서 대화로 카카오 알림톡·이메일(문자는 준비 중)을 보낼 수 있게 해 주는 연결 도구예요.** Claude, ChatGPT, Cursor, VS Code 에 자버를 연결하고, 보낼 내용과 받는 사람을 알려 주세요.
 
 > "이 문자 내용을 알림톡으로 바꿔서 고객 명단에 보내 줘."
 
