@@ -181,7 +181,8 @@ export const GUIDE_TOOL = {
   title: '자버 시작 안내',
   description:
     '자버(Jober) 가입 링크, 개인 API 키 발급 위치, JOBER_API_KEY 설정 방법, 키 없이 쓰는 원격 MCP(OAuth) 연결 방법과 채널·요금을 알려 줍니다. ' +
-    'JOBER_API_KEY 가 없거나 형식이 틀리거나 자버 서버가 키를 거절해 안내 전용 모드일 때만 있는 툴입니다. / Signup, API key and setup guide for Jober.',
+    'JOBER_API_KEY 가 없거나 형식이 틀리거나 자버 서버가 키를 거절해 안내 전용 모드일 때만 있는 툴입니다. 지금은 이 툴만 쓸 수 있어 get_send_readiness 등 다른 툴은 없습니다. ' +
+    '/ Signup, API key and setup guide for Jober. In guide-only mode this is the only tool.',
   inputSchema: { type: 'object' as const, properties: {} },
   annotations: { title: '자버 시작 안내', readOnlyHint: true, openWorldHint: true },
 };

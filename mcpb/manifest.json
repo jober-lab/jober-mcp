@@ -25,7 +25,8 @@
       "command": "node",
       "args": ["${__dirname}/dist/index.js"],
       "env": {
-        "JOBER_API_KEY": "${user_config.jober_api_key}"
+        "JOBER_API_KEY": "${user_config.jober_api_key}",
+        "JOBER_MCP_DIST": "mcpb"
       }
     }
   },

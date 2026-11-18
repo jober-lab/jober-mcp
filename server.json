@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.jober/jober-mcp",
   "title": "Jober (자버) KakaoTalk AlimTalk",
-  "description": "Send KakaoTalk AlimTalk (카카오 알림톡), SMS (문자) and email campaigns in Korea from AI agents",
+  "description": "Send KakaoTalk AlimTalk (카카오 알림톡) and email campaigns in Korea from AI agents. SMS (문자) soon",
   "websiteUrl": "https://jober.io/developers/mcp",
   "repository": {
     "url": "https://github.com/jober-lab/jober-mcp",

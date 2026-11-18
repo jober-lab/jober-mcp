@@ -266,6 +266,7 @@ OAuth 대신 개인 API 키를 쓰려면 `Authorization: Bearer jbr_live_xxxxxxx
 | 이름 | 필수 | 기본값 | 설명 |
 |---|---|---|---|
 | `JOBER_API_KEY` | 아니요(없으면 안내 전용 모드) | 없음 | 자버 개인 API 키(`jbr_live_`). 없거나 형식이 틀리면 [안내 전용 모드](#안내-전용-모드-키가-없을-때)로 시작합니다. 회사 API 키(`jbr_co_`)는 MCP 에 쓸 수 없습니다. |
+| `JOBER_MCP_DIST` | 아니요 | 없음 | Claude Desktop 확장 프로그램(.mcpb)이 `mcpb` 로 넘깁니다. 키 거절·권한 부족 안내에 "Claude 설정 > 확장 프로그램 > 자버 > 설정에서 키를 바꾸세요"를 덧붙입니다. 직접 설정할 필요는 없습니다. |
 | `JOBER_API_BASE` | 아니요 | `https://api.jober.io` | 자버 API 주소. `<주소>/mcp` 로 연결합니다(이미 `/mcp` 로 끝나면 그대로). 키 보호를 위해 https 만 허용하고, http 는 `localhost`·`127.0.0.1` 개발 서버만 허용합니다. |
 
 ## 툴 목록

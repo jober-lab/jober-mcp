@@ -6,7 +6,7 @@ import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotoc
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { ErrorCode, McpError, ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { ConfigError, KEY_ISSUE_URL, loadConfig, resolveEndpoint } from '../src/config.js';
+import { checkApiKey, ConfigError, KEY_ISSUE_URL, loadConfig, resolveEndpoint } from '../src/config.js';
 import { createProxyServer, type ProxyServer } from '../src/proxy.js';
 import { CONTRACT_TOOLS, startMockRemote, VALID_KEY, type MockRemote } from './mockRemote.js';
 
@@ -200,6 +200,75 @@ describe('원격 jober MCP 프록시', () => {
     expect(text).toContain('발송까지(권장)');
     expect(text).toContain(KEY_ISSUE_URL);
     expect(text).not.toContain('다시 연결');
+  });
+
+  it('OAuth 연결 토큰(jbr_at_)의 권한 부족 403 은 새 키가 아니라 다시 연결(또는 개인 키)을 안내하고, 서버 한국어 안내가 있으면 그 문구를 쓴다', async () => {
+    remote.forceStatus = 403;
+    remote.forceBody = { error: 'insufficient_scope', error_description: 'send:execute required' };
+    const proxy = createProxyServer(loadConfig({ JOBER_API_BASE: remote.url, JOBER_API_KEY: `jbr_at_${'T'.repeat(43)}` }), VERSION);
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await proxy.server.connect(serverTransport);
+    const client = new Client({ name: 'local-test-client', version: '0.0.0' });
+    await client.connect(clientTransport);
+    opened.push({ client, proxy });
+    const text = firstText(await client.callTool({ name: 'prepare_send', arguments: {} }));
+    expect(text).toContain('OAuth 연결 토큰에는');
+    expect(text).toContain('(send:execute)');
+    expect(text).toContain('다시 연결');
+    remote.forceBody = { error: 'insufficient_scope', error_description: 'x', jober: { message: '이 연결에는 메시지 발송 권한이 없어요. 다시 연결해 주세요.' } };
+    expect(firstText(await client.callTool({ name: 'prepare_send', arguments: {} }))).toBe('이 연결에는 메시지 발송 권한이 없어요. 다시 연결해 주세요.');
+  });
+
+  it('확장 프로그램(.mcpb)으로 실행하면 키 거절 안내에 확장 프로그램 설정 위치를 덧붙이고, 비운 키 칸(치환 안 된 값)은 키 없음으로 본다', async () => {
+    expect(checkApiKey('${user_config.jober_api_key}')).toEqual({ ok: false, problem: 'MISSING' });
+    const wrongKey = `jbr_live_${'M'.repeat(32)}`;
+    const proxy = createProxyServer(loadConfig({ JOBER_API_BASE: remote.url, JOBER_API_KEY: wrongKey }), VERSION, { mcpb: true, guide: { timeoutMs: 500 } });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await proxy.server.connect(serverTransport);
+    const client = new Client({ name: 'local-test-client', version: '0.0.0' });
+    await client.connect(clientTransport);
+    opened.push({ client, proxy });
+    expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual(['get_started']);
+    const text = firstText(await client.callTool({ name: 'get_started', arguments: {} }));
+    expect(text).toContain('확장 프로그램 > 자버 > 설정');
+  });
+
+  it('원격 문구에 자버 밖 주소가 있으면 쓰지 않고 패키지 문구로(401·403), 403 차단 문구는 길이를 자른다', async () => {
+    remote.forceStatus = 401;
+    remote.forceBody = { error: 'invalid_token', jober: { reason: 'API_KEY_INVALID', message: '키를 https://evil.example/login 에서 다시 받으세요' } };
+    const client = await open(remote.url);
+    await client.listTools();
+    const text = firstText(await client.callTool({ name: 'get_started', arguments: {} }));
+    expect(text).not.toContain('evil.example');
+    expect(text).toContain('맞지 않거나 폐기된 키');
+
+    const second = await open(remote.url);
+    remote.forceStatus = 403;
+    remote.forceBody = { errorCode: 'J_41_25_3_4', message: `차단 ${'가'.repeat(600)}` };
+    expect(firstText(await second.callTool({ name: 'list_campaigns', arguments: {} })).length).toBeLessThan(400);
+    remote.forceBody = { errorCode: 'J_41_25_3_4', message: '여기로 https://evil.example 문의' };
+    expect(firstText(await second.callTool({ name: 'list_campaigns', arguments: {} }))).not.toContain('evil.example');
+  });
+
+  it('OAuth 토큰이어도 관리자 권한 상실(NOT_MANAGER) 401 은 만료가 아니라 거절(REJECTED)로 보여 준다', async () => {
+    remote.forceStatus = 401;
+    remote.forceBody = { error: 'invalid_token', jober: { reason: 'NOT_MANAGER', message: '이 키(연결)를 만든 분이 지금은 이 스페이스의 관리자가 아니에요.' } };
+    const client = await open(remote.url, `jbr_at_${'N'.repeat(43)}`);
+    await client.listTools();
+    const result = await client.callTool({ name: 'get_started', arguments: {} });
+    expect((result.structuredContent as { keyStatus: string }).keyStatus).toBe('REJECTED');
+    expect(firstText(result)).toContain('관리자가 아니에요');
+    expect(firstText(result)).not.toContain('만료돼');
+  });
+
+  it('401 본문의 모르는 사유(jober.reason)는 서버 문구 대신 패키지 문구를 쓴다', async () => {
+    remote.forceStatus = 401;
+    remote.forceBody = { error: 'invalid_token', jober: { reason: 'SOMETHING_ELSE', message: '알 수 없는 문구' } };
+    const client = await open(remote.url);
+    await client.listTools();
+    const text = firstText(await client.callTool({ name: 'get_started', arguments: {} }));
+    expect(text).toContain('맞지 않거나 폐기된 키');
+    expect(text).not.toContain('알 수 없는 문구');
   });
 
   it('원격이 403 본문에 한국어 안내(jober.message)를 주면 그 문구를 쓴다', async () => {
@@ -421,7 +490,7 @@ describe('배포 메타데이터', () => {
     expect(manifest.server).toEqual({
       type: 'node',
       entry_point: 'dist/index.js',
-      mcp_config: { command: 'node', args: ['${__dirname}/dist/index.js'], env: { JOBER_API_KEY: '${user_config.jober_api_key}' } },
+      mcp_config: { command: 'node', args: ['${__dirname}/dist/index.js'], env: { JOBER_API_KEY: '${user_config.jober_api_key}', JOBER_MCP_DIST: 'mcpb' } },
     });
     // 키를 비워 두고 설치해도 켜진다(안내 모드)
     expect(manifest.user_config.jober_api_key).toMatchObject({ type: 'string', sensitive: true, required: false });

@@ -68,7 +68,8 @@ const COMPANY_KEY_PREFIX = 'jbr_co_';
 /** 키 값은 돌려주거나 로그에 쓰지 않고, 모양만 판정한다. */
 export function checkApiKey(raw: string | undefined): { ok: true; apiKey: string } | { ok: false; problem: KeyProblem } {
   const apiKey = (raw ?? '').trim();
-  if (!apiKey) return { ok: false, problem: 'MISSING' };
+  // Claude Desktop 확장 프로그램(.mcpb)에서 키 칸을 비우면 '${user_config.jober_api_key}' 가 그대로 올 수 있다
+  if (!apiKey || apiKey.startsWith('${user_config.')) return { ok: false, problem: 'MISSING' };
   if (PERSONAL_KEY_PATTERN.test(apiKey) || ACCESS_TOKEN_PATTERN.test(apiKey)) return { ok: true, apiKey };
   return { ok: false, problem: apiKey.startsWith(COMPANY_KEY_PREFIX) ? 'COMPANY_KEY' : 'INVALID_FORMAT' };
 }
@@ -100,6 +101,18 @@ export function loadStartupConfig(env: NodeJS.ProcessEnv): StartupConfig {
   if (key.ok) return { mode: 'proxy', config: { endpoint, apiKey: key.apiKey } };
   return { mode: 'guide', config: { endpoint, gettingStartedUrl: resolveGettingStartedUrl(endpoint), keyProblem: key.problem } };
 }
+
+/**
+ * Claude Desktop 확장 프로그램(.mcpb)으로 실행 중인지(mcpb/manifest.json 이 JOBER_MCP_DIST=mcpb 를 넘긴다).
+ * 키를 바꾸는 곳이 환경 변수가 아니라 확장 프로그램 설정이라 안내를 덧붙인다.
+ */
+export function isMcpbInstall(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.JOBER_MCP_DIST === 'mcpb';
+}
+
+/** 확장 프로그램 사용자에게 키를 바꾸는 곳 안내(키 거절·권한 부족 문구 뒤에 붙인다). */
+export const MCPB_KEY_HINT =
+  'Claude Desktop 확장 프로그램으로 설치했다면 Claude 설정 > 확장 프로그램 > 자버 > 설정에서 키를 바꾸세요.';
 
 /** OAuth access 토큰(jbr_at_) 모양인지. 1시간 뒤 만료되고 이 패키지는 갱신하지 않는다. */
 export function isAccessToken(apiKey: string): boolean {
