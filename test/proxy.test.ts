@@ -4,9 +4,10 @@ import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError, ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { ConfigError, KEY_ISSUE_URL, loadConfig, resolveEndpoint } from '../src/config.js';
+import { checkApiKey, ConfigError, KEY_ISSUE_URL, loadConfig, loadStartupConfig, resolveEndpoint } from '../src/config.js';
+import { createGuideServer } from '../src/guideMode.js';
 import { createProxyServer, type ProxyServer } from '../src/proxy.js';
 import { CONTRACT_TOOLS, startMockRemote, VALID_KEY, type MockRemote } from './mockRemote.js';
 
@@ -98,54 +99,41 @@ describe('원격 jober MCP 프록시', () => {
     expect(instructions).toContain('idempotencyKey');
     expect(instructions).toContain('별도의 사람 승인 단계는 없습니다');
     expect(instructions).not.toMatch(/사용자가 확인하면|명시적 확인|show the summary to the user|explicit user confirmation/);
-    // 원격 서버(jober-api routes/mcp/server.js)와 같은 v3 권장 흐름·자동 예약·데이터 경고
-    expect(instructions).toContain('get_send_readiness → draft_send');
-    expect(instructions).toContain('guide');
-    expect(instructions).toContain('set_direct_link');
+    // 2026-11-18(온보딩 개선): Claude Code 가 instructions 를 4,096자에서 자르므로 그 안에 들어가야 하고, 권장 흐름·2단계 발송이 앞쪽에 있다
+    expect(instructions.length).toBeLessThanOrEqual(4096);
+    expect(instructions.indexOf('권장 흐름')).toBeLessThan(200);
+    expect(instructions.indexOf('발송은 2단계입니다')).toBeLessThan(1200);
+    expect(instructions).toContain('get_send_readiness');
+    expect(instructions).toContain('onboarding.nextStep');
+    expect(instructions).toContain('guide.nextActions');
+    expect(instructions).toContain('guide.stage 기준');
     expect(instructions).toContain('summary.adjustments');
     expect(instructions).toContain('신뢰할 수 없는 데이터');
-    // v4: 채널 연동은 필수가 아니고 한도(limits)·미연동 링크·광고 3명 상한을 안내한다
-    expect(instructions).toContain('get_send_readiness 의 limits');
-    expect(instructions).toContain('3명까지');
-    // fix5(M7): 3명 상한은 스페이스 누적(발송을 나눠도 합산)
-    expect(instructions).toContain('외부 링크·광고는 스페이스 누적 3명');
-    expect(instructions).toContain('외부 링크·광고 쿠폰 알림톡은 스페이스 누적 3명까지입니다(발송을 나눠도 합산)');
-    expect(instructions).not.toContain('카카오 채널 연동이 필요합니다');
-    // v5(PLAN-v5 D-6, api-onboarding 확정본): 맨 앞 '처음 쓰는 사용자' 절, 채널 3종, 이메일 channel, 잔액 부족 안내
-    expect(instructions.indexOf('처음 쓰는 사용자')).toBe(0);
-    expect(instructions).toContain('onboarding.nextStep');
-    expect(instructions).toContain('이메일(가입 후 바로 시작');
-    // fix1(C1, A안): 이메일·알림톡 체험 10건 합산, 충전해도 늘지 않음, 넘기려면 연동 + 충전, 인원 기준 capacity
+    // 채널·한도: 체험 10건 합산(충전해도 늘지 않음), 미연동 링크·광고 스페이스 누적 3명, 정본은 readiness channels[]·limits
     expect(instructions).toContain('알림톡과 합쳐 체험 10건');
     expect(instructions).toContain('충전해도 늘지 않으며');
     expect(instructions).toContain('카카오 채널 연동과 충전이 모두 필요합니다');
+    expect(instructions).toContain('스페이스 누적 3명');
     expect(instructions).toContain('channels[EMAIL].quota');
     expect(instructions).toContain('channels[].capacity');
-    expect(instructions).toContain('guide.stage 기준');
-    // v6.1(CONTRACTS.md 11-7): 문자는 정보성만, 오너 플로우(몇 초 안내·미리보기·테스트 발송), 정보성 메일 표기, explanation.why
-    expect(instructions).toContain('문자(정보성 안내만');
+    // 문자는 서버 스위치로 열고 닫으므로 세부 조건 없이 channels[SMS] 로 확인(문서·화면 '준비 중'과 어긋나지 않게)
+    expect(instructions).toContain('channels[SMS]');
+    expect(instructions).not.toContain('건당 50원');
+    // 진행 방식(v6)·미리보기·테스트 발송·야간 채널별·광고 동의
     expect(instructions).toContain('묻지 말고 진행하세요');
-    expect(instructions).toContain('템플릿을 찾는 데 몇 초 걸려요');
+    expect(instructions).toContain('채널은 묻지 마세요');
     expect(instructions).toContain('preview.previewUrl');
     expect(instructions).toContain('send_test');
-    expect(instructions).toContain('정보성 이메일에는 (광고)·보낸 곳을 넣지 않습니다');
-    expect(instructions).toContain('explanation.why');
-    expect(instructions).not.toContain('ask the user when the channel is not decided');
-    expect(instructions).toContain('channels[].available');
     expect(instructions).toContain('channel:"EMAIL"');
-    expect(instructions).toContain('(광고)');
-    expect(instructions).toContain('야간 자동 예약 없음');
     expect(instructions).toContain('J_41_23_1_14');
     expect(instructions).toContain('data.prepaidUrl');
     expect(instructions).toContain('channels[KAKAO].setup');
     expect(instructions).toContain('카카오 알림톡·이메일 발송 도구입니다');
-    // fix2(R2-1): 야간 규칙은 채널별, 광고성 알림톡만 08:00 자동 예약, 정보성 알림톡·이메일(광고성 포함)은 즉시
     expect(instructions).toContain('야간 규칙은 채널별입니다: 광고성 알림톡만 KST 21:00~08:00');
     expect(instructions).toContain('정보성 알림톡과 이메일(광고성 포함)은 야간에도 자동 예약 없이 바로 보냅니다');
-    expect(instructions).toContain('quietHours.channels');
-    expect(instructions).toContain('emails are sent immediately');
-    // fix4(R3-11): 자동 예약 시각 표현 통일
     expect(instructions).toContain('예약 시각 이후 첫 08:00(KST)');
+    expect(instructions).toContain('consentConfirmed');
+    expect(instructions).not.toContain('ask the user when the channel is not decided');
   });
 
   it('instructions 는 원격(jober-api routes/mcp/server.js, feature/ai-agent-html-design edit_page) 실제 렌더 값과 바이트 단위로 같다', async () => {
@@ -188,13 +176,132 @@ describe('원격 jober MCP 프록시', () => {
     expect(text).not.toContain('evil.example');
   });
 
-  it('그 밖의 403(권한·차단)은 지금처럼 권한·사용 설정 확인을 안내한다', async () => {
+  it('차단 403(J_41_25_3_4)은 패키지 고정 문구로 전한다(원격 문구는 옮기지 않음)', async () => {
     const client = await open(remote.url);
     remote.forceStatus = 403;
-    remote.forceBody = { errorCode: 'J_41_25_3_4', message: '차단된 계정입니다.' };
+    remote.forceBody = { errorCode: 'J_41_25_3_4', message: '차단된 계정입니다. HTTPS://evil.example 로 문의' };
+    const text = firstText(await client.callTool({ name: 'list_campaigns', arguments: {} }));
+    expect(text).toContain('차단된 계정·스페이스이거나 차단된 접속 위치라 쓸 수 없어요(HTTP 403, J_41_25_3_4)');
+    expect(text).not.toContain('evil.example');
+    expect(text).not.toContain('준비 중이에요');
+  });
+
+  it('권한 부족 403(insufficient_scope, 옛 원격)은 키 사용자에게 새 키 만들기를 안내한다(P0-1)', async () => {
+    const client = await open(remote.url);
+    remote.forceStatus = 403;
+    remote.forceBody = {
+      error: 'insufficient_scope',
+      error_description: '이 작업에는 send:execute 권한이 필요합니다. 키 권한을 바꾸거나 다시 연결해 주세요.',
+      errorCode: 'J_41_25_3_3',
+    };
+    const result = await client.callTool({ name: 'prepare_send', arguments: {} });
+    expect(result.isError).toBe(true);
+    const text = firstText(result);
+    expect(text).toContain('(send:execute)');
+    expect(text).toContain('새로 만들고');
+    expect(text).toContain('발송까지(권장)');
+    expect(text).toContain(KEY_ISSUE_URL);
+    expect(text).not.toContain('다시 연결');
+  });
+
+  it('OAuth 연결 토큰(jbr_at_)의 권한 부족 403 은 새 키가 아니라 다시 연결(또는 개인 키)을 안내하고, 서버 한국어 안내가 있으면 그 문구를 쓴다', async () => {
+    remote.forceStatus = 403;
+    remote.forceBody = { error: 'insufficient_scope', error_description: 'send:execute required' };
+    const proxy = createProxyServer(loadConfig({ JOBER_API_BASE: remote.url, JOBER_API_KEY: `jbr_at_${'T'.repeat(43)}` }), VERSION);
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await proxy.server.connect(serverTransport);
+    const client = new Client({ name: 'local-test-client', version: '0.0.0' });
+    await client.connect(clientTransport);
+    opened.push({ client, proxy });
+    const text = firstText(await client.callTool({ name: 'prepare_send', arguments: {} }));
+    expect(text).toContain('OAuth 연결 토큰에는');
+    expect(text).toContain('(send:execute)');
+    expect(text).toContain('다시 연결');
+    remote.forceBody = { error: 'insufficient_scope', error_description: 'send:execute', jober: { message: 'HTTPS://evil.example 에서 다시 연결' } };
+    const second = firstText(await client.callTool({ name: 'prepare_send', arguments: {} }));
+    expect(second).toContain('OAuth 연결 토큰에는');
+    expect(second).not.toContain('evil.example');
+  });
+
+  it('확장 프로그램(.mcpb)으로 실행하면 키 거절 안내에 확장 프로그램 설정 위치를 덧붙이고, 비운 키 칸(치환 안 된 값)은 키 없음으로 본다', async () => {
+    expect(checkApiKey('${user_config.jober_api_key}')).toEqual({ ok: false, problem: 'MISSING' });
+    const wrongKey = `jbr_live_${'M'.repeat(32)}`;
+    const proxy = createProxyServer(loadConfig({ JOBER_API_BASE: remote.url, JOBER_API_KEY: wrongKey }), VERSION, { mcpb: true, guide: { timeoutMs: 500 } });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await proxy.server.connect(serverTransport);
+    const client = new Client({ name: 'local-test-client', version: '0.0.0' });
+    await client.connect(clientTransport);
+    opened.push({ client, proxy });
+    expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual(['get_started']);
+    const text = firstText(await client.callTool({ name: 'get_started', arguments: {} }));
+    expect(text).toContain('확장 프로그램 > 자버 > 설정');
+  });
+
+  it('원격 문구에 자버 밖 주소가 있으면 쓰지 않고 패키지 문구로(401·403), 403 차단 문구는 길이를 자른다', async () => {
+    remote.forceStatus = 401;
+    remote.forceBody = { error: 'invalid_token', jober: { reason: 'API_KEY_INVALID', message: '키를 HTTPS://evil.example/login 에서 다시 받으세요' } };
+    const client = await open(remote.url);
+    await client.listTools();
+    const text = firstText(await client.callTool({ name: 'get_started', arguments: {} }));
+    expect(text).not.toContain('evil.example');
+    expect(text).toContain('맞지 않거나 폐기된 키');
+
+    const second = await open(remote.url);
+    remote.forceStatus = 403;
+    remote.forceBody = { errorCode: 'J_41_25_3_4', message: `차단 ${'가'.repeat(600)}` };
+    expect(firstText(await second.callTool({ name: 'list_campaigns', arguments: {} })).length).toBeLessThan(400);
+    remote.forceBody = { errorCode: 'J_41_25_3_4', message: '여기로 https://evil.example 문의' };
+    expect(firstText(await second.callTool({ name: 'list_campaigns', arguments: {} }))).not.toContain('evil.example');
+  });
+
+  it('OAuth 토큰이어도 관리자 권한 상실(NOT_MANAGER) 401 은 만료가 아니라 거절(REJECTED)로 보여 준다', async () => {
+    remote.forceStatus = 401;
+    remote.forceBody = { error: 'invalid_token', jober: { reason: 'NOT_MANAGER', message: '이 키(연결)를 만든 분이 지금은 이 스페이스의 관리자가 아니에요.' } };
+    const client = await open(remote.url, `jbr_at_${'N'.repeat(43)}`);
+    await client.listTools();
+    const result = await client.callTool({ name: 'get_started', arguments: {} });
+    expect((result.structuredContent as { keyStatus: string }).keyStatus).toBe('REJECTED');
+    expect(firstText(result)).toContain('관리자가 아니에요');
+    expect(firstText(result)).not.toContain('만료돼');
+  });
+
+  it('확장 프로그램(.mcpb)으로 키 없이 시작하면 env·claude mcp add 대신 확장 프로그램 설정 위치를 안내한다', async () => {
+    for (const env of [{}, { JOBER_API_KEY: 'abc' }, { JOBER_API_KEY: `jbr_co_${'A'.repeat(40)}` }]) {
+      const startup = loadStartupConfig({ JOBER_API_BASE: remote.url, ...env });
+      if (startup.mode !== 'guide') throw new Error('guide mode expected');
+      const server = createGuideServer(startup.config, VERSION, { mcpb: true, timeoutMs: 500 });
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      await server.connect(serverTransport);
+      const client = new Client({ name: 'local-test-client', version: '0.0.0' });
+      await client.connect(clientTransport);
+      expect(client.getInstructions()).toContain('확장 프로그램 > 자버 > 설정');
+      const text = firstText(await client.callTool({ name: 'get_started', arguments: {} }));
+      expect(text).toContain('확장 프로그램 > 자버 > 설정');
+      expect(text).not.toContain('claude mcp add');
+      const other = firstText(await client.callTool({ name: 'list_campaigns', arguments: {} }));
+      expect(other).toContain('확장 프로그램 > 자버 > 설정');
+      expect(other).not.toContain('MCP 서버를 다시 시작');
+      await client.close();
+    }
+  });
+
+  it('401 본문의 모르는 사유(jober.reason)는 서버 문구 대신 패키지 문구를 쓴다', async () => {
+    remote.forceStatus = 401;
+    remote.forceBody = { error: 'invalid_token', jober: { reason: 'SOMETHING_ELSE', message: '알 수 없는 문구' } };
+    const client = await open(remote.url);
+    await client.listTools();
+    const text = firstText(await client.callTool({ name: 'get_started', arguments: {} }));
+    expect(text).toContain('맞지 않거나 폐기된 키');
+    expect(text).not.toContain('알 수 없는 문구');
+  });
+
+  it('원격 403 본문의 문구(jober.message)는 옮기지 않고 기본 문구를 쓴다(대문자·상대 주소 링크 우회 차단)', async () => {
+    const client = await open(remote.url);
+    remote.forceStatus = 403;
+    remote.forceBody = { error: 'forbidden', jober: { message: '여기서 다시 받으세요 HTTPS://evil.example //evil.example' } };
     const text = firstText(await client.callTool({ name: 'list_campaigns', arguments: {} }));
     expect(text).toContain('권한이 없습니다(HTTP 403)');
-    expect(text).not.toContain('준비 중이에요');
+    expect(text).not.toContain('evil.example');
   });
 
   it('tools/call 인자와 structuredContent 를 그대로 전달한다', async () => {
@@ -224,23 +331,88 @@ describe('원격 jober MCP 프록시', () => {
     expect((error as McpError).message).toContain('Unknown tool: delete_everything');
   });
 
-  it('잘못된 키(401)는 키 발급 위치·가입 링크와 함께 명확한 오류를 준다', async () => {
-    // 형식은 맞지만 서버가 모르는(폐기·오타) 키
+  it('잘못된 키(401)면 tools/list 를 오류로 떨어뜨리지 않고 안내 모드(get_started)로 바꾼다(P0-4)', async () => {
+    // 형식은 맞지만 서버가 모르는(폐기·오타) 키. 옛 원격처럼 본문에 한국어 안내가 없어도 패키지 문구로 안내한다
     const wrongKey = `jbr_live_${'W'.repeat(32)}`;
-    const client = await open(remote.url, wrongKey);
-    const listError = await client.listTools().catch((e: unknown) => e);
-    expect(listError).toBeInstanceOf(McpError);
-    expect((listError as McpError).message).toContain('HTTP 401');
-    expect((listError as McpError).message).toContain(KEY_ISSUE_URL);
-    expect((listError as McpError).message).toContain(SIGNUP_URL);
-    expect((listError as McpError).message).not.toContain(wrongKey);
+    const rejected: string[] = [];
+    const proxy = createProxyServer(loadConfig({ JOBER_API_BASE: remote.url, JOBER_API_KEY: wrongKey }), VERSION, {
+      onRejected: (detail) => rejected.push(detail),
+      guide: { timeoutMs: 500 },
+    });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await proxy.server.connect(serverTransport);
+    const client = new Client({ name: 'local-test-client', version: '0.0.0' });
+    await client.connect(clientTransport);
+    opened.push({ client, proxy });
 
+    const listed = await client.listTools();
+    expect(listed.tools.map((tool) => tool.name)).toEqual(['get_started']);
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0]).toContain('맞지 않거나 폐기된 키');
+    expect(rejected[0]).not.toContain(wrongKey);
+
+    const guide = await client.callTool({ name: 'get_started', arguments: {} });
+    expect(guide.isError).toBeFalsy();
+    const guideText = firstText(guide);
+    expect(guideText).toContain('자버 서버가 JOBER_API_KEY 를 거절해(HTTP 401)');
+    expect(guideText).toContain('맞지 않거나 폐기된 키');
+    expect(guideText).toContain(KEY_ISSUE_URL);
+    expect(guideText).toContain(SIGNUP_URL);
+    expect(guideText).not.toContain(wrongKey);
+    expect((guide.structuredContent as { keyStatus: string }).keyStatus).toBe('REJECTED');
+
+    const other = await client.callTool({ name: 'list_campaigns', arguments: {} });
+    expect(other.isError).toBe(true);
+    expect(firstText(other)).toContain('안내 전용 모드');
+    // 거절 뒤에는 원격에 다시 붙지 않는다(키를 바꾸려면 다시 시작해야 한다)
+    const mcpCalls = remote.requests.length;
+    await client.listTools();
+    expect(remote.requests.length).toBe(mcpCalls);
+  });
+
+  it('401 본문의 한국어 안내(jober.message)가 있으면 그 사유를 쓴다(관리자 권한 상실 등)', async () => {
+    remote.forceStatus = 401;
+    remote.forceBody = {
+      error: 'invalid_token',
+      error_description: 'The connected person is no longer a manager of this space',
+      jober: { reason: 'NOT_MANAGER', message: '이 키(연결)를 만든 분이 지금은 이 스페이스의 관리자가 아니에요.' },
+    };
+    const client = await open(remote.url);
+    expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual(['get_started']);
+    const text = firstText(await client.callTool({ name: 'get_started', arguments: {} }));
+    expect(text).toContain('이 스페이스의 관리자가 아니에요');
+    expect(text).not.toContain('The connected person');
+  });
+
+  it('OAuth 연결 토큰(jbr_at_)이 거절되면 1시간 만료·개인 키·원격 OAuth 연결을 안내한다(P2-5)', async () => {
+    const token = `jbr_at_${'T'.repeat(43)}`;
+    const client = await open(remote.url, token);
+    expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual(['get_started']);
+    const result = await client.callTool({ name: 'get_started', arguments: {} });
+    const text = firstText(result);
+    expect(text).toContain('1시간 뒤 만료');
+    expect(text).toContain('jbr_live_');
+    expect(text).toContain('https://api.jober.io/mcp');
+    expect(text).not.toContain(token);
+    expect((result.structuredContent as { keyStatus: string }).keyStatus).toBe('TOKEN_EXPIRED');
+  });
+
+  it('쓰는 도중 키가 거절되면(401) 그 호출은 한국어 사유로 끝나고 툴 목록 변경을 알린 뒤 안내 모드가 된다', async () => {
+    const client = await open(remote.url);
+    let changed = 0;
+    client.setNotificationHandler(ToolListChangedNotificationSchema, () => {
+      changed += 1;
+    });
+    expect((await client.listTools()).tools.length).toBeGreaterThan(1);
+    remote.forceStatus = 401;
+    remote.forceBody = { error: 'invalid_token', jober: { reason: 'API_KEY_INVALID', message: '자버 개인 API 키가 맞지 않거나 폐기된 키예요.' } };
     const result = await client.callTool({ name: 'list_campaigns', arguments: {} });
     expect(result.isError).toBe(true);
-    expect(firstText(result)).toContain('HTTP 401');
-    expect(firstText(result)).toContain('가입');
-    expect(firstText(result)).toContain(SIGNUP_URL);
-    expect(firstText(result)).not.toContain(wrongKey);
+    expect(firstText(result)).toContain('자버 개인 API 키가 맞지 않거나 폐기된 키예요(HTTP 401)');
+    expect(firstText(result)).toContain('안내 전용 모드');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(changed).toBe(1);
+    expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual(['get_started']);
   });
 
   it('원격 서버가 꺼져 있으면 연결 불가 오류를 준다', async () => {
@@ -336,10 +508,26 @@ describe('배포 메타데이터', () => {
     expect(server.remotes[0]).toEqual({ type: 'streamable-http', url: 'https://api.jober.io/mcp' });
   });
 
-  it('버전(0.6.1)·io.jober 이름공간·검색 키워드(알림톡)·가입 링크(client=registry)를 싣는다', () => {
+  it('Claude Desktop Extension(.mcpb) manifest: 내장 Node 로 dist/index.js 실행, 키 입력 칸(sensitive)을 JOBER_API_KEY 로, 고정 다운로드 주소(계약)', () => {
+    const manifest = JSON.parse(readFileSync(new URL('../mcpb/manifest.json', import.meta.url), 'utf8'));
+    expect(manifest.manifest_version).toBe('0.3');
+    expect(manifest.name).toBe('jober-mcp');
+    expect(manifest.icon).toBe('icon.png');
+    expect(manifest.server).toEqual({
+      type: 'node',
+      entry_point: 'dist/index.js',
+      mcp_config: { command: 'node', args: ['${__dirname}/dist/index.js'], env: { JOBER_API_KEY: '${user_config.jober_api_key}', JOBER_MCP_DIST: 'mcpb' } },
+    });
+    // 키를 비워 두고 설치해도 켜진다(안내 모드)
+    expect(manifest.user_config.jober_api_key).toMatchObject({ type: 'string', sensitive: true, required: false });
+    const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+    expect(readme).toContain('https://github.com/jober-lab/jober-mcp/releases/latest/download/jober-mcp.mcpb');
+  });
+
+  it('버전(0.7.0)·io.jober 이름공간·검색 키워드(알림톡)·가입 링크(client=registry)를 싣는다', () => {
     const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
     const server = JSON.parse(readFileSync(new URL('../server.json', import.meta.url), 'utf8'));
-    expect(pkg.version).toBe('0.6.1');
+    expect(pkg.version).toBe('0.7.0');
     expect(server.name).toBe('io.jober/jober-mcp');
     // 0.6.1: description 은 검색 키워드 자리로 쓰고, 가입 링크는 JOBER_API_KEY 설명에만 둔다
     expect(server.description).toContain('KakaoTalk AlimTalk');

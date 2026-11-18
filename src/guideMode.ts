@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { describeKeyProblem, type GuideConfig, type KeyProblem } from './config.js';
+import { describeKeyProblem, isMcpbInstall, MCPB_KEY_HINT, type GuideConfig, type KeyProblem } from './config.js';
 import { SERVER_NAME, SERVER_TITLE } from './proxy.js';
 
 /**
@@ -111,35 +111,45 @@ const KEY_STATUS_LABEL: Record<KeyProblem, string> = {
   MISSING: 'JOBER_API_KEY 가 설정되지 않아',
   INVALID_FORMAT: 'JOBER_API_KEY 형식이 올바르지 않아',
   COMPANY_KEY: 'JOBER_API_KEY 에 회사 API 키(jbr_co_)가 들어 있어(MCP 는 개인 API 키만 받습니다)',
+  REJECTED: '자버 서버가 JOBER_API_KEY 를 거절해(HTTP 401)',
+  TOKEN_EXPIRED: 'JOBER_API_KEY 의 OAuth 연결 토큰(jbr_at_)이 만료돼(HTTP 401)',
 };
 
 const CHANNEL_LABEL: Record<string, string> = { EMAIL: '이메일', KAKAO: '카카오 알림톡', SMS: '문자' };
 const STATUS_LABEL: Record<string, string> = { AVAILABLE: '가능', COMING_SOON: '준비 중' };
 
 /** 안내 모드 서버 instructions. LLM 이 get_started 를 부르고 사람에게 가입·키 설정을 안내하도록 한다. */
-export function guideInstructions(problem: KeyProblem): string {
+export function guideInstructions(problem: KeyProblem, mcpb = false): string {
   return [
     `자버(Jober) MCP 가 안내 전용 모드로 실행 중입니다: ${KEY_STATUS_LABEL[problem]} 발송 툴을 쓸 수 없습니다. ` +
-      'get_started 를 호출해 사용자에게 가입과 키 발급 방법을 안내하고, 키를 받으면 MCP 설정의 JOBER_API_KEY 에 넣고 다시 시작하라고 알려 주세요. ' +
+      `get_started 를 호출해 사용자에게 가입과 키 발급 방법을 안내하고, 키를 받으면 ${mcpb ? 'Claude 설정 > 확장 프로그램 > 자버 > 설정의 키 칸' : 'MCP 설정의 JOBER_API_KEY'}에 넣고 다시 시작하라고 알려 주세요. ` +
       '가입과 키 발급은 사용자가 웹에서 직접 합니다. 키 없이 쓰려면 원격 MCP 주소를 OAuth 로 연결하는 방법도 안내할 수 있습니다.',
     'Jober MCP is running in guide-only mode because JOBER_API_KEY is missing or unusable. Call get_started and relay the signup, ' +
-      'API key and setup steps to the user; after they set JOBER_API_KEY, the MCP server must be restarted. Remote MCP with OAuth is an alternative.',
+      `API key and setup steps to the user; after they set ${mcpb ? 'the key in Claude Settings > Extensions > Jober' : 'JOBER_API_KEY'}, ` +
+      'the MCP server must be restarted. Remote MCP with OAuth is an alternative.',
   ].join('\n');
 }
 
-/** get_started 결과 텍스트. 가입 링크·키 발급 위치·설정 방법·원격 OAuth 대안을 순서대로 적는다. */
-export function renderGuideText(guide: GettingStarted, problem: KeyProblem, source: GuideSource): string {
+/**
+ * get_started 결과 텍스트. 가입 링크·키 발급 위치·설정 방법·원격 OAuth 대안을 순서대로 적는다.
+ * detail 은 서버가 401 본문 jober.message 로 준 한국어 사유(2026-11-18). 없으면 패키지 내장 문구(describeKeyProblem).
+ */
+export function renderGuideText(guide: GettingStarted, problem: KeyProblem, source: GuideSource, detail?: string, mcpb = false): string {
   const { connect, pricing } = guide;
   const keyName = connect.localPackage.env[0] ?? 'JOBER_API_KEY';
   const lines = [
     `자버(Jober) 시작 안내 / Getting started: ${guide.product}`,
     `현재 상태: ${KEY_STATUS_LABEL[problem]} 안내 전용 모드입니다(get_started 툴만 쓸 수 있음).`,
-    ...(problem === 'MISSING' ? [] : [describeKeyProblem(problem)]),
+    ...(problem === 'MISSING' ? [] : [detail ?? (mcpb ? `${describeKeyProblem(problem)} ${MCPB_KEY_HINT}` : describeKeyProblem(problem))]),
     '',
     `1. 가입(사람이 직접): ${guide.signupUrl}`,
     `2. 개인 API 키 발급(jbr_live_ 로 시작, 한 번만 보임): ${connect.localPackage.keyIssueUrl}`,
-    `3. 설정: MCP 클라이언트 설정의 env 에 ${keyName}=<발급한 키> 를 넣고 MCP 서버(또는 AI 도구)를 다시 시작하세요.`,
-    `   예(Claude Code): claude mcp add jober -e ${keyName}=<발급한 키> -- npx -y ${connect.localPackage.name}`,
+    ...(mcpb
+      ? ['3. 설정: Claude 설정 > 확장 프로그램 > 자버 > 설정의 \'자버 개인 API 키\' 칸에 발급한 키를 넣고 확장 프로그램을 껐다 켜세요(또는 Claude Desktop 다시 시작).']
+      : [
+          `3. 설정: MCP 클라이언트 설정의 env 에 ${keyName}=<발급한 키> 를 넣고 MCP 서버(또는 AI 도구)를 다시 시작하세요.`,
+          `   예(Claude Code): claude mcp add jober -e ${keyName}=<발급한 키> -- npx -y ${connect.localPackage.name}`,
+        ]),
     connect.oauth
       ? `4. 키 없이 연결(OAuth): 원격 MCP 주소 ${connect.remoteMcpUrl} 를 AI 도구에 직접 추가하면 브라우저에서 자버 로그인·연결 승인으로 연결됩니다.`
       : `4. 원격 MCP 주소: ${connect.remoteMcpUrl}`,
@@ -170,45 +180,65 @@ export function renderGuideText(guide: GettingStarted, problem: KeyProblem, sour
   return lines.join('\n');
 }
 
-/** 안내 모드 stdio 서버. get_started 툴 1개만 노출한다. */
-export function createGuideServer(config: GuideConfig, version: string, options: FetchGuideOptions = {}): Server {
-  const server = new Server({ name: SERVER_NAME, title: SERVER_TITLE, version }, { capabilities: { tools: {} }, instructions: guideInstructions(config.keyProblem) });
+/** get_started 툴 정의(안내 모드와, 키가 거절돼 안내 모드로 바뀐 프록시가 같이 쓴다). */
+export const GUIDE_TOOL = {
+  name: GUIDE_TOOL_NAME,
+  title: '자버 시작 안내',
+  description:
+    '자버(Jober) 가입 링크, 개인 API 키 발급 위치, JOBER_API_KEY 설정 방법, 키 없이 쓰는 원격 MCP(OAuth) 연결 방법과 채널·요금을 알려 줍니다. ' +
+    'JOBER_API_KEY 가 없거나 형식이 틀리거나 자버 서버가 키를 거절해 안내 전용 모드일 때만 있는 툴입니다. 지금은 이 툴만 쓸 수 있어 get_send_readiness 등 다른 툴은 없습니다. ' +
+    '/ Signup, API key and setup guide for Jober. In guide-only mode this is the only tool.',
+  inputSchema: { type: 'object' as const, properties: {} },
+  annotations: { title: '자버 시작 안내', readOnlyHint: true, openWorldHint: true },
+};
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: [
+/** get_started 결과(원격 공개 안내 → 실패하면 동봉 사본). detail 은 서버가 준 한국어 거절 사유. */
+export async function getStartedResult(
+  gettingStartedUrl: URL,
+  problem: KeyProblem,
+  options: FetchGuideOptions = {},
+  detail?: string,
+  mcpb = false,
+): Promise<{ content: Array<{ type: 'text'; text: string }>; structuredContent: Record<string, unknown> }> {
+  const remote = await fetchGettingStarted(gettingStartedUrl, options);
+  const source: GuideSource = remote ? 'remote' : 'fallback';
+  const guide = remote ?? loadFallbackGuide();
+  return {
+    content: [{ type: 'text' as const, text: renderGuideText(guide, problem, source, detail, mcpb) }],
+    structuredContent: { ...guide, guideSource: source, keyStatus: problem },
+  };
+}
+
+/** 안내 모드에서 get_started 가 아닌 툴을 불렀을 때 */
+export function guideOnlyToolError(toolName: string, problem: KeyProblem, detail?: string, mcpb = false) {
+  const reason = detail ?? (mcpb ? `${describeKeyProblem(problem)} ${MCPB_KEY_HINT}` : describeKeyProblem(problem));
+  const where = mcpb ? 'Claude 설정 > 확장 프로그램 > 자버 > 설정에서 키를 넣고 확장 프로그램을 껐다 켜세요' : 'JOBER_API_KEY 를 설정한 뒤 MCP 서버를 다시 시작하세요';
+  return {
+    content: [
       {
-        name: GUIDE_TOOL_NAME,
-        title: '자버 시작 안내',
-        description:
-          '자버(Jober) 가입 링크, 개인 API 키 발급 위치, JOBER_API_KEY 설정 방법, 키 없이 쓰는 원격 MCP(OAuth) 연결 방법과 채널·요금을 알려 줍니다. ' +
-          'JOBER_API_KEY 가 없거나 형식이 틀려 안내 전용 모드일 때만 있는 툴입니다. / Signup, API key and setup guide for Jober.',
-        inputSchema: { type: 'object' as const, properties: {} },
-        annotations: { title: '자버 시작 안내', readOnlyHint: true, openWorldHint: true },
+        type: 'text' as const,
+        text:
+          `지금은 안내 전용 모드라 ${toolName} 툴을 쓸 수 없습니다. get_started 를 호출해 가입·키 발급 방법을 확인하고, ` +
+          `${where}. ${reason}`,
       },
     ],
-  }));
+    isError: true,
+  };
+}
+
+/** 안내 모드 stdio 서버. get_started 툴 1개만 노출한다. */
+export function createGuideServer(config: GuideConfig, version: string, options: FetchGuideOptions & { mcpb?: boolean } = {}): Server {
+  const mcpb = options.mcpb ?? isMcpbInstall();
+  const server = new Server(
+    { name: SERVER_NAME, title: SERVER_TITLE, version },
+    { capabilities: { tools: {} }, instructions: guideInstructions(config.keyProblem, mcpb) },
+  );
+
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [GUIDE_TOOL] }));
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    if (request.params.name !== GUIDE_TOOL_NAME) {
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text:
-              `지금은 안내 전용 모드라 ${request.params.name} 툴을 쓸 수 없습니다. get_started 를 호출해 가입·키 발급 방법을 확인하고, ` +
-              `JOBER_API_KEY 를 설정한 뒤 MCP 서버를 다시 시작하세요. ${describeKeyProblem(config.keyProblem)}`,
-          },
-        ],
-        isError: true,
-      };
-    }
-    const remote = await fetchGettingStarted(config.gettingStartedUrl, options);
-    const source: GuideSource = remote ? 'remote' : 'fallback';
-    const guide = remote ?? loadFallbackGuide();
-    return {
-      content: [{ type: 'text' as const, text: renderGuideText(guide, config.keyProblem, source) }],
-      structuredContent: { ...guide, guideSource: source, keyStatus: config.keyProblem },
-    };
+    if (request.params.name !== GUIDE_TOOL_NAME) return guideOnlyToolError(request.params.name, config.keyProblem, undefined, mcpb);
+    return getStartedResult(config.gettingStartedUrl, config.keyProblem, options, undefined, mcpb);
   });
 
   return server;
