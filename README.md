@@ -11,7 +11,7 @@ AI 가 메시지를 알림톡이나 이메일 발송에 맞게 준비해요. 버
 
 MCP 가 낯설어도 괜찮아요. AI 도구가 자버의 기능을 쓸 수 있도록 연결하는 방식이라고 생각하면 돼요.
 
-카카오 알림톡은 받는 사람이 채널 친구를 추가하지 않아도 전화번호로 보낼 수 있어요. 월 구독료 없이 필요한 만큼 미리 충전하고, 보낸 건수만큼 차감하는 선불 방식이에요. 발송 비용은 건당 약 50원이에요. 문자(SMS)는 정보성 안내만 보낼 수 있고, 자버 설정에서 문자 발송을 켠 뒤에 쓸 수 있어요.
+카카오 알림톡은 받는 사람이 채널 친구를 추가하지 않아도 전화번호로 보낼 수 있어요. 월 구독료 없이 필요한 만큼 미리 충전하고, 보낸 건수만큼 차감하는 선불 방식이에요. 발송 비용은 건당 약 50원이에요. 문자 발송은 준비 중이에요.
 
 > Jober (자버, [jober.io](https://jober.io)) is a Korean messaging service for KakaoTalk AlimTalk, email and SMS. It is not Jobber, the field service software.
 
@@ -36,9 +36,10 @@ MCP 가 낯설어도 괜찮아요. AI 도구가 자버의 기능을 쓸 수 있�
 | 연결 방법 | 이렇게 시작하세요 |
 |---|---|
 | **설치 없이 연결하기(OAuth)** | AI 도구의 커넥터 또는 MCP 설정에 `https://api.jober.io/mcp` 를 추가하세요. 열리는 화면에서 자버에 로그인하고 연결을 허용하면 돼요([원격 URL 직접 연결](#원격-url-직접-연결-oauth)). |
+| **Claude Desktop 확장 프로그램(API 키)** | [jober-mcp.mcpb](https://github.com/jober-lab/jober-mcp/releases/latest/download/jober-mcp.mcpb) 를 내려받아 두 번 누르고, 설치 창에 자버 개인 API 키를 붙여 넣으세요. 설정 파일 편집이나 Node.js 설치가 필요 없어요([Claude Desktop](#claude-desktop)). |
 | **내 컴퓨터에서 패키지로 연결하기(API 키)** | `npx -y @joberhr/jober-mcp` 를 MCP 서버 실행 명령으로 등록하세요. 설정의 `JOBER_API_KEY` 에 자버 개인 API 키를 넣으면 돼요([설치](#설치)). |
 
-패키지로 연결한다면 [설정 > AI 도구 연동](https://jober.io/settings/integrations)에서 개인 API 키(`jbr_live_...`)를 발급해 주세요. 키를 `JOBER_API_KEY` 에 넣은 뒤 MCP 서버를 다시 시작하면 돼요.
+패키지로 연결한다면 [설정 > AI 도구 연동](https://jober.io/settings/integrations)에서 개인 API 키(`jbr_live_...`)를 **'발송까지(권장)'** 권한으로 발급해 주세요. 권한을 줄여 만든 키는 명단 등록·발송 단계에서 막히고, 키 권한은 만든 뒤 바꿀 수 없어 새로 만들어야 해요. 키를 `JOBER_API_KEY` 에 넣은 뒤 MCP 서버를 다시 시작하면 돼요.
 
 AI 도구별 설정 방법은 아래 [설치](#설치)와 [자버 개발자 문서: MCP 서버](https://jober.io/developers/mcp)에서 확인할 수 있어요.
 
@@ -71,7 +72,7 @@ Company API keys (`jbr_co_`) are for server integrations (send API, free-send RE
   (fetched without a key from `<JOBER_API_BASE>/ai-agent/v2/public/getting-started?client=local`, with a bundled offline copy).
   Set the key and restart the server to get the campaign tools. An invalid `JOBER_API_BASE` still exits with code 1.
 - **Channels**: `EMAIL` (right after signup, prepaid balance) and `KAKAO` (default) via
-  `draft_send`'s `channel`, and `SMS` for informational messages only (50 KRW each, must be enabled in Jober, `channels[SMS]`; ads are rejected with `J_41_21_1_10`). Omit `channel` and the server decides it (`channelDecision`). Check `channels[]` and `onboarding.nextStep` in `get_send_readiness`.
+  `draft_send`'s `channel`, and `SMS` (coming soon; once enabled on the server: informational messages only, 50 KRW each, see `channels[SMS]`; ads are rejected with `J_41_21_1_10`). Omit `channel` and the server decides it (`channelDecision`). Check `channels[]` and `onboarding.nextStep` in `get_send_readiness`.
   Before a Kakao channel is connected, email and AlimTalk share the 10-send trial, and charging does not raise it; connect the channel
   and charge to send more (see `channels[EMAIL].quota`; pass `targets` to `get_send_readiness` for `channels[].capacity`).
   Insufficient balance is `J_41_23_1_14` with `data.prepaidUrl`.
@@ -123,7 +124,7 @@ MCP 클라이언트에 보이는 서버 표시 이름(title)은 원격과 같은
 |---|---|---|---|
 | 이메일 | `EMAIL` | 가능 | 가입 후 바로 보낼 수 있습니다(선불 잔액 차감, 가입 보너스 500원으로 약 10건). 카카오 채널을 연동하기 전에는 알림톡과 합쳐 체험 10건까지이고 충전해도 늘지 않으며, 10건을 넘기려면 카카오 채널 연동과 충전이 모두 필요합니다(남은 수는 `channels[EMAIL].quota`). 보내기 전에 스팸 검사를 거칩니다. 밤에도 자동 예약 없이 바로 보냅니다(낮 시간 권장). 받는 사람은 연락처의 이메일 칸(`recipients.columnMap.email`)으로 정합니다. 광고성이면 서버가 제목 앞 `(광고)`, 수신거부, 보내는 곳 이름·연락처를 강제합니다(없으면 `guide` 가 `email.sender` 를 묻습니다) |
 | 카카오 알림톡 | `KAKAO`(기본값) | 가능 | 채널 연동 전에는 체험 10건(이메일과 합쳐 10건), 외부 링크·광고 쿠폰 알림톡은 스페이스 누적 3명까지(발송을 나눠도 합산). 광고성 알림톡이 밤 9시~아침 8시(한국 시간)에 걸리면 예약 시각 이후 첫 08:00(한국 시간)으로 자동 예약하고, 정보성 알림톡은 바로 보냅니다. 연동에는 사업자등록증, 카카오 비즈니스 채널(카카오 심사 3~4일), 고객센터 번호, 인증번호와 연동비 50,000원(부가세 별도)이 필요하며 연동은 사용자가 웹에서 직접 합니다 |
-| 문자 | `SMS` | 서버 설정에 따라 가능(`channels[SMS].available`) | 정보성 안내만 보냅니다(광고성이면 400 `J_41_21_1_10`, 알림톡·이메일로 보내 주세요). 건당 50원(선불). 자버 전자문서 설정에서 문자 발송을 켜야 하고(꺼져 있으면 409 `J_41_23_1_19` + `data.settingsUrl`), 발신번호를 등록하기 전에는 자버 공용 번호로 3건, 등록 뒤에는 하루 50명·한 번에 30명·누적 300명까지입니다(넘으면 409 `J_41_23_1_18`). 맨 앞에 `[스페이스 이름]` 이 붙고 본문은 800바이트(한글 약 400자)까지, 90바이트를 넘으면 LMS 로 나갑니다. 문자 기능이 꺼진 서버에서는 넣으면 400 `J_41_21_1_8` |
+| 문자 | `SMS` | 준비 중(서버 설정으로 열면 `channels[SMS].available: true`) | 문자 발송은 준비 중이에요. 아래는 서버에서 문자를 연 뒤의 규칙입니다. 정보성 안내만 보냅니다(광고성이면 400 `J_41_21_1_10`, 알림톡·이메일로 보내 주세요). 건당 50원(선불). 자버 전자문서 설정에서 문자 발송을 켜야 하고(꺼져 있으면 409 `J_41_23_1_19` + `data.settingsUrl`), 발신번호를 등록하기 전에는 자버 공용 번호로 3건, 등록 뒤에는 하루 50명·한 번에 30명·누적 300명까지입니다(넘으면 409 `J_41_23_1_18`). 맨 앞에 `[스페이스 이름]` 이 붙고 본문은 800바이트(한글 약 400자)까지, 90바이트를 넘으면 LMS 로 나갑니다. 문자 기능이 꺼진 서버에서는 넣으면 400 `J_41_21_1_8` |
 
 - 실제로 쓸 수 있는지는 `get_send_readiness` 의 `channels[]`(순서 EMAIL·KAKAO·SMS)와 `onboarding.nextStep` 으로 확인하세요. 이메일은 서버 설정에 따라 아직 열려 있지 않을 수 있습니다(404 `J_41_20_1_2`).
 - `channel` 을 넣지 않은 기존 호출은 모두 알림톡(`KAKAO`)으로 동작합니다. 카카오 채널 미연동 스페이스는 기본으로 이메일과 알림톡이 체험 10건을 함께 씁니다(`notices` 의 `EMAIL_SHARES_KAKAO_TRIAL`). 충전해도 이 10건은 늘지 않습니다. 서버 설정에 따라 체험 공유 대신 가입 초기 하루 200명 상한이 걸릴 수 있으니 실제 값은 `channels[EMAIL].quota` 로 확인하세요.
@@ -151,7 +152,17 @@ claude mcp add jober -e JOBER_API_KEY=jbr_live_xxxxxxxx -- npx -y @joberhr/jober
 
 ### Claude Desktop
 
-`claude_desktop_config.json` (macOS: `~/Library/Application Support/Claude/`, Windows: `%APPDATA%\Claude\`)
+**가장 쉬운 방법: 확장 프로그램(.mcpb)**
+
+1. [jober-mcp.mcpb](https://github.com/jober-lab/jober-mcp/releases/latest/download/jober-mcp.mcpb) 를 내려받습니다.
+2. 파일을 두 번 누르거나 Claude Desktop **설정 > 확장 프로그램(Extensions)** 화면으로 끌어다 놓습니다.
+3. 설치 창의 **자버 개인 API 키** 칸에 키(`jbr_live_...`)를 붙여 넣고 설치합니다. 키는 OS 보안 저장소에 저장됩니다.
+
+Node.js 를 따로 설치하지 않아도 됩니다(Claude Desktop 에 들어 있는 Node 로 실행). 키를 비워 두고 설치하면 안내 전용 모드(`get_started`)로 켜집니다. 자동 업데이트는 없으니 새 버전이 나오면 같은 주소에서 다시 내려받아 설치하세요.
+
+**직접 설정 파일에 넣기**
+
+Claude Desktop **Settings > Developer > Edit Config** 로 `claude_desktop_config.json` 을 엽니다(macOS: `~/Library/Application Support/Claude/`, Windows: `%APPDATA%\Claude\`). 수정한 뒤에는 Claude Desktop 을 완전히 종료하고 다시 실행하세요.
 
 ```json
 {
@@ -239,11 +250,13 @@ OAuth 대신 개인 API 키를 쓰려면 `Authorization: Bearer jbr_live_xxxxxxx
 ## 안내 전용 모드 (키가 없을 때)
 
 `JOBER_API_KEY` 가 비어 있거나, 개인 API 키 모양(`jbr_live_` + 영문·숫자 32자 이상)이 아니거나, 회사 API 키(`jbr_co_`)면 종료하지 않고 안내 전용 모드로 시작합니다.
+모양은 맞지만 **자버 서버가 키를 거절하면(HTTP 401: 오타·폐기·키를 만든 분의 관리자 권한 상실)** 첫 연결 때 안내 전용 모드로 바뀝니다(0.7.0). 예전처럼 `tools/list` 가 오류로 끝나 툴 목록이 비지 않고, `get_started` 결과 첫머리에 한국어 사유가 나옵니다(서버가 401 본문 `jober.message` 로 준 문구, 옛 서버면 패키지 문구). 쓰는 도중 거절되면 그 호출은 사유와 함께 `isError` 로 끝나고 `notifications/tools/list_changed` 를 보낸 뒤 안내 전용 모드가 됩니다. stderr 에는 `키가 거절되어 안내 모드로 바꿨어요` 가 남습니다.
+`JOBER_API_KEY` 에 OAuth 연결 토큰(`jbr_at_`)을 넣으면 시작할 때 경고합니다. 이 토큰은 1시간 뒤 만료되고 패키지는 갱신하지 않으므로, 개인 API 키를 쓰거나 원격 주소를 OAuth 로 직접 연결하세요(원격 연결은 1시간마다 자동 갱신되고 30일 동안 쓰지 않으면 다시 연결해야 합니다).
 
 - 원격 MCP(`/mcp`)에 연결하지 않고, 툴은 `get_started` 하나만 노출합니다. 서버 안내문(instructions)이 AI 도구에 `get_started` 를 부르라고 알려 줍니다.
 - `get_started` 는 자버 공개 안내 `<JOBER_API_BASE>/ai-agent/v2/public/getting-started?client=local` 을 키 없이 조회하고(3초), 실패하면 패키지에 들어 있는 사본을 씁니다.
   결과 텍스트는 가입 링크, 개인 API 키 발급 위치, `JOBER_API_KEY` 설정 방법, 키 없이 쓰는 원격 MCP(OAuth) 연결, 채널·요금, 첫 발송 예시 순서입니다.
-  `structuredContent` 는 공개 안내 JSON 그대로에 `guideSource`(`remote`·`fallback`)와 `keyStatus`(`MISSING`·`INVALID_FORMAT`·`COMPANY_KEY`)를 더한 값입니다.
+  `structuredContent` 는 공개 안내 JSON 그대로에 `guideSource`(`remote`·`fallback`)와 `keyStatus`(`MISSING`·`INVALID_FORMAT`·`COMPANY_KEY`·`REJECTED`·`TOKEN_EXPIRED`)를 더한 값입니다.
 - 키 값은 stderr·툴 결과 어디에도 쓰지 않습니다. 가입 링크는 다른 주소로 넘기는 파라미터가 없는 고정 경로(`/start/ai?src=mcp&client=local`)만 씁니다.
 - 키를 넣은 뒤에는 MCP 서버(또는 AI 도구)를 다시 시작해야 발송 툴이 보입니다.
 - `JOBER_API_BASE` 형식 오류는 지금처럼 stderr 안내 후 종료 코드 1 로 끝납니다.
@@ -363,14 +376,14 @@ OAuth 대신 개인 API 키를 쓰려면 `Authorization: Bearer jbr_live_xxxxxxx
 
 ## 문제 해결
 
-연결 단계 오류(인증 401, 권한·MCP 사용·차단 403, 호출 한도 429, 404)는 HTTP 상태로 오고, 이 패키지가 아래 `…(HTTP 401)` 같은 메시지로 알려 줍니다.
+연결 단계 오류(인증 401, 차단 403, 호출 한도 429, 404)는 HTTP 상태로 오고, 이 패키지가 아래처럼 한국어로 알려 줍니다(401 은 안내 전용 모드로 바뀜).
 툴 실행 중 오류는 HTTP 200 의 정상 JSON-RPC 응답으로 오며 `result.isError: true` 이고, `content` 안의 `errorCode` 로 판별합니다(아래 `J_` 코드 행).
 코드 옆 괄호의 숫자는 같은 코드의 자유 발송 API(REST) HTTP 상태이며 MCP 에서는 HTTP 상태로 오지 않습니다.
 
 | 증상 | 확인할 것 |
 |---|---|
 | 툴이 `get_started` 하나만 보임, stderr 에 `guide mode` | 안내 전용 모드입니다. 클라이언트 설정의 `env` 에 개인 API 키(`jbr_live_` 로 시작하는 전체 값)를 넣었는지 확인하고 MCP 서버를 다시 시작 |
-| `인증에 실패했습니다(HTTP 401)` | 키 오타·폐기 여부 확인, 필요하면 새 키 발급. 자버 계정이 없으면 메시지의 가입 링크(`https://jober.io/start/ai?src=mcp&client=local`)에서 가입한 뒤 키 발급 |
+| 툴이 `get_started` 하나만 보임, stderr 에 `키가 거절되어 안내 모드로 바꿨어요` | 자버 서버가 키를 거절(HTTP 401). 키 전체를 앞뒤 공백 없이 붙여 넣었는지 확인하고, 그래도 안 되면 [설정 > AI 도구 연동](https://jober.io/settings/integrations)에서 새 개인 키를 만들어 바꾼 뒤 다시 시작. 키를 만든 분이 관리자가 아니게 됐다면 관리자에게 권한을 요청 |
 | `J_41_23_1_14`(툴 오류, REST 409) | 선불 잔액 부족. `data.prepaidUrl` 에서 충전하거나 받는 사람을 줄인 뒤 다시 준비(`data.balance`·`estimatedCost`·`shortBy`) |
 | `J_41_20_1_2`(툴 오류, REST 404) | 이메일 발송이 아직 열려 있지 않음. 알림톡(`KAKAO`)으로 보내기 |
 | `J_41_21_1_8`·`J_41_21_1_7`(툴 오류, REST 400) | 이 서버에서 문자(`SMS`)가 아직 꺼져 있음(`channels[SMS].available: false`, `reason: "FLAG_OFF"`), 그 밖 `channel` 값은 잘못됨. `EMAIL`·`KAKAO`·`SMS` 중 쓸 수 있는 것으로 |
@@ -378,7 +391,8 @@ OAuth 대신 개인 API 키를 쓰려면 `Authorization: Bearer jbr_live_xxxxxxx
 | `J_41_23_1_17`(툴 오류, REST 409) | 테스트 발송 하루 5번을 다 씀(스페이스·채널 합산, `data.resetAt` 에 다시 가능) |
 | `J_41_23_1_18`·`J_41_23_1_19`(툴 오류, REST 409) | 문자 발송 한도 초과(`data.code`), 또는 자버에서 문자 발송을 켜지 않음(`data.settingsUrl` 을 사용자에게 주기) |
 | `자버 AI 에이전트 연결은 아직 준비 중이에요(HTTP 403, J_41_25_3_1)` | 자버 MCP 연결이 아직 열려 있지 않음. 그동안은 웹(`https://jober.io/ai/kakao/infotalk`)에서 사용 |
-| `권한이 없습니다(HTTP 403)` | 키 권한(scope)과 스페이스의 MCP 사용 설정 확인. 계정·IP 차단이면 `J_41_25_3_4` |
+| `이 개인 API 키에는 … 권한이 없어` (`J_41_25_3_3`) | 키를 만들 때 그 권한을 빼고 만듦. 개인 키 권한은 바꿀 수 없으니 '발송까지(권장)'로 새 키를 만들어 `JOBER_API_KEY` 를 바꾸고 다시 시작 |
+| `차단된 계정·스페이스이거나 …(HTTP 403, J_41_25_3_4)` | 계정·스페이스·접속 위치가 차단됨. 자버 고객센터에 문의 |
 | `J_41_22_3_1`(툴 오류) | 키 주인에게 그 스페이스의 연락처 보기·수정 권한이 없음 |
 | `요청이 너무 많습니다(HTTP 429)` | 잠시 후 다시 시도(`J_41_25_4_4`) |
 | `J_41_22_4_17`·`J_41_20_4_2`(툴 오류) | 설문 생성 하루 한도면 `J_41_22_4_17`(KST 자정 초기화, 그 전에는 `list_surveys` 로 기존 설문 사용), 내용 검사 호출 한도면 `J_41_20_4_2` |

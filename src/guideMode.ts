@@ -111,6 +111,8 @@ const KEY_STATUS_LABEL: Record<KeyProblem, string> = {
   MISSING: 'JOBER_API_KEY 가 설정되지 않아',
   INVALID_FORMAT: 'JOBER_API_KEY 형식이 올바르지 않아',
   COMPANY_KEY: 'JOBER_API_KEY 에 회사 API 키(jbr_co_)가 들어 있어(MCP 는 개인 API 키만 받습니다)',
+  REJECTED: '자버 서버가 JOBER_API_KEY 를 거절해(HTTP 401)',
+  TOKEN_EXPIRED: 'JOBER_API_KEY 의 OAuth 연결 토큰(jbr_at_)이 만료돼(HTTP 401)',
 };
 
 const CHANNEL_LABEL: Record<string, string> = { EMAIL: '이메일', KAKAO: '카카오 알림톡', SMS: '문자' };
@@ -127,14 +129,17 @@ export function guideInstructions(problem: KeyProblem): string {
   ].join('\n');
 }
 
-/** get_started 결과 텍스트. 가입 링크·키 발급 위치·설정 방법·원격 OAuth 대안을 순서대로 적는다. */
-export function renderGuideText(guide: GettingStarted, problem: KeyProblem, source: GuideSource): string {
+/**
+ * get_started 결과 텍스트. 가입 링크·키 발급 위치·설정 방법·원격 OAuth 대안을 순서대로 적는다.
+ * detail 은 서버가 401 본문 jober.message 로 준 한국어 사유(2026-11-18). 없으면 패키지 내장 문구(describeKeyProblem).
+ */
+export function renderGuideText(guide: GettingStarted, problem: KeyProblem, source: GuideSource, detail?: string): string {
   const { connect, pricing } = guide;
   const keyName = connect.localPackage.env[0] ?? 'JOBER_API_KEY';
   const lines = [
     `자버(Jober) 시작 안내 / Getting started: ${guide.product}`,
     `현재 상태: ${KEY_STATUS_LABEL[problem]} 안내 전용 모드입니다(get_started 툴만 쓸 수 있음).`,
-    ...(problem === 'MISSING' ? [] : [describeKeyProblem(problem)]),
+    ...(problem === 'MISSING' ? [] : [detail ?? describeKeyProblem(problem)]),
     '',
     `1. 가입(사람이 직접): ${guide.signupUrl}`,
     `2. 개인 API 키 발급(jbr_live_ 로 시작, 한 번만 보임): ${connect.localPackage.keyIssueUrl}`,
@@ -170,45 +175,57 @@ export function renderGuideText(guide: GettingStarted, problem: KeyProblem, sour
   return lines.join('\n');
 }
 
+/** get_started 툴 정의(안내 모드와, 키가 거절돼 안내 모드로 바뀐 프록시가 같이 쓴다). */
+export const GUIDE_TOOL = {
+  name: GUIDE_TOOL_NAME,
+  title: '자버 시작 안내',
+  description:
+    '자버(Jober) 가입 링크, 개인 API 키 발급 위치, JOBER_API_KEY 설정 방법, 키 없이 쓰는 원격 MCP(OAuth) 연결 방법과 채널·요금을 알려 줍니다. ' +
+    'JOBER_API_KEY 가 없거나 형식이 틀리거나 자버 서버가 키를 거절해 안내 전용 모드일 때만 있는 툴입니다. / Signup, API key and setup guide for Jober.',
+  inputSchema: { type: 'object' as const, properties: {} },
+  annotations: { title: '자버 시작 안내', readOnlyHint: true, openWorldHint: true },
+};
+
+/** get_started 결과(원격 공개 안내 → 실패하면 동봉 사본). detail 은 서버가 준 한국어 거절 사유. */
+export async function getStartedResult(
+  gettingStartedUrl: URL,
+  problem: KeyProblem,
+  options: FetchGuideOptions = {},
+  detail?: string,
+): Promise<{ content: Array<{ type: 'text'; text: string }>; structuredContent: Record<string, unknown> }> {
+  const remote = await fetchGettingStarted(gettingStartedUrl, options);
+  const source: GuideSource = remote ? 'remote' : 'fallback';
+  const guide = remote ?? loadFallbackGuide();
+  return {
+    content: [{ type: 'text' as const, text: renderGuideText(guide, problem, source, detail) }],
+    structuredContent: { ...guide, guideSource: source, keyStatus: problem },
+  };
+}
+
+/** 안내 모드에서 get_started 가 아닌 툴을 불렀을 때 */
+export function guideOnlyToolError(toolName: string, problem: KeyProblem, detail?: string) {
+  return {
+    content: [
+      {
+        type: 'text' as const,
+        text:
+          `지금은 안내 전용 모드라 ${toolName} 툴을 쓸 수 없습니다. get_started 를 호출해 가입·키 발급 방법을 확인하고, ` +
+          `JOBER_API_KEY 를 설정한 뒤 MCP 서버를 다시 시작하세요. ${detail ?? describeKeyProblem(problem)}`,
+      },
+    ],
+    isError: true,
+  };
+}
+
 /** 안내 모드 stdio 서버. get_started 툴 1개만 노출한다. */
 export function createGuideServer(config: GuideConfig, version: string, options: FetchGuideOptions = {}): Server {
   const server = new Server({ name: SERVER_NAME, title: SERVER_TITLE, version }, { capabilities: { tools: {} }, instructions: guideInstructions(config.keyProblem) });
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: [
-      {
-        name: GUIDE_TOOL_NAME,
-        title: '자버 시작 안내',
-        description:
-          '자버(Jober) 가입 링크, 개인 API 키 발급 위치, JOBER_API_KEY 설정 방법, 키 없이 쓰는 원격 MCP(OAuth) 연결 방법과 채널·요금을 알려 줍니다. ' +
-          'JOBER_API_KEY 가 없거나 형식이 틀려 안내 전용 모드일 때만 있는 툴입니다. / Signup, API key and setup guide for Jober.',
-        inputSchema: { type: 'object' as const, properties: {} },
-        annotations: { title: '자버 시작 안내', readOnlyHint: true, openWorldHint: true },
-      },
-    ],
-  }));
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [GUIDE_TOOL] }));
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    if (request.params.name !== GUIDE_TOOL_NAME) {
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text:
-              `지금은 안내 전용 모드라 ${request.params.name} 툴을 쓸 수 없습니다. get_started 를 호출해 가입·키 발급 방법을 확인하고, ` +
-              `JOBER_API_KEY 를 설정한 뒤 MCP 서버를 다시 시작하세요. ${describeKeyProblem(config.keyProblem)}`,
-          },
-        ],
-        isError: true,
-      };
-    }
-    const remote = await fetchGettingStarted(config.gettingStartedUrl, options);
-    const source: GuideSource = remote ? 'remote' : 'fallback';
-    const guide = remote ?? loadFallbackGuide();
-    return {
-      content: [{ type: 'text' as const, text: renderGuideText(guide, config.keyProblem, source) }],
-      structuredContent: { ...guide, guideSource: source, keyStatus: config.keyProblem },
-    };
+    if (request.params.name !== GUIDE_TOOL_NAME) return guideOnlyToolError(request.params.name, config.keyProblem);
+    return getStartedResult(config.gettingStartedUrl, config.keyProblem, options);
   });
 
   return server;

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { ConfigError, describeKeyProblem, loadStartupConfig } from './config.js';
+import { ACCESS_TOKEN_WARNING, ConfigError, describeKeyProblem, isAccessToken, loadStartupConfig } from './config.js';
 import { createGuideServer } from './guideMode.js';
 import { createProxyServer } from './proxy.js';
 
@@ -20,12 +20,18 @@ async function main(): Promise<void> {
     return;
   }
   const { config } = startup;
-  const { server, closeRemote } = createProxyServer(config, version);
+  const { server, closeRemote } = createProxyServer(config, version, {
+    // 키가 거절되면(401) 안내 모드로 바뀐다. Claude Desktop 로그(mcp-server-*.log)에서 찾기 쉽게 한국어 사유를 남긴다.
+    onRejected: (detail) => {
+      process.stderr.write(`[jober-mcp] ${version} 키가 거절되어 안내 모드로 바꿨어요(get_started 만 사용 가능): ${detail}\n`);
+    },
+  });
   server.onclose = () => {
     void closeRemote();
   };
   await server.connect(new StdioServerTransport());
   process.stderr.write(`[jober-mcp] ${version} ready, proxying to ${config.endpoint.toString()}\n`);
+  if (isAccessToken(config.apiKey)) process.stderr.write(`[jober-mcp] ${ACCESS_TOKEN_WARNING}\n`);
 }
 
 main().catch((error: unknown) => {

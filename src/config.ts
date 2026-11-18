@@ -51,7 +51,13 @@ export function resolveEndpoint(apiBase: string | undefined): URL {
 }
 
 /** 키가 없거나 MCP 에서 쓸 수 없는 모양일 때의 이유. 안내 전용 모드로 시작한다. */
-export type KeyProblem = 'MISSING' | 'INVALID_FORMAT' | 'COMPANY_KEY';
+/**
+ * 키가 없거나 MCP 에서 쓸 수 없는 이유. 안내 전용 모드로 시작(또는 전환)한다.
+ * - MISSING·INVALID_FORMAT·COMPANY_KEY: 시작할 때 모양으로 판정
+ * - REJECTED: 모양은 맞지만 자버 서버가 거절(HTTP 401: 틀린 키·폐기·관리자 권한 상실). 첫 연결 때 판정해 안내 모드로 바꾼다(2026-11-18)
+ * - TOKEN_EXPIRED: OAuth access 토큰(jbr_at_)이 거절됨(1시간 만료). 이 패키지는 토큰을 갱신하지 않는다
+ */
+export type KeyProblem = 'MISSING' | 'INVALID_FORMAT' | 'COMPANY_KEY' | 'REJECTED' | 'TOKEN_EXPIRED';
 
 // 서버 키 모양(jober-api routes/oauth/domain/credentials.js): 개인 키 jbr_live_ + base62 32자, OAuth access 토큰 jbr_at_ + base62 43자.
 // 서버가 길이를 늘려도 막지 않도록 최소 길이만 본다. 회사 키(jbr_co_)는 MCP 에서 401 이다.
@@ -95,8 +101,36 @@ export function loadStartupConfig(env: NodeJS.ProcessEnv): StartupConfig {
   return { mode: 'guide', config: { endpoint, gettingStartedUrl: resolveGettingStartedUrl(endpoint), keyProblem: key.problem } };
 }
 
+/** OAuth access 토큰(jbr_at_) 모양인지. 1시간 뒤 만료되고 이 패키지는 갱신하지 않는다. */
+export function isAccessToken(apiKey: string): boolean {
+  return ACCESS_TOKEN_PATTERN.test(apiKey);
+}
+
+/** OAuth access 토큰을 JOBER_API_KEY 에 넣었을 때 시작 경고(키 값은 넣지 않는다). */
+export const ACCESS_TOKEN_WARNING =
+  'JOBER_API_KEY 에 OAuth 연결 토큰(jbr_at_)이 들어 있어요. 이 토큰은 1시간 뒤 만료되고 이 패키지는 자동으로 갱신하지 않아요. ' +
+  `오래 쓰려면 ${KEY_ISSUE_URL} 에서 개인 API 키(jbr_live_)를 만들어 넣거나, AI 도구에 원격 주소 https://api.jober.io/mcp 를 직접 추가해 OAuth 로 연결하세요` +
+  '(원격 연결은 1시간마다 자동 갱신되고, 30일 동안 쓰지 않으면 다시 연결해야 해요). / ' +
+  'JOBER_API_KEY holds an OAuth access token (jbr_at_), which expires in 1 hour and is not refreshed by this package. ' +
+  'Use a personal API key (jbr_live_) or add the remote MCP URL with OAuth instead.';
+
 /** 키 문제를 사용자에게 보여 줄 문구(키 값은 넣지 않는다). */
 export function describeKeyProblem(problem: KeyProblem): string {
+  if (problem === 'REJECTED') {
+    return (
+      `자버 개인 API 키가 맞지 않거나 폐기된 키예요(HTTP 401). 키 전체를 앞뒤 공백 없이 붙여 넣었는지 확인하고, 그래도 안 되면 ` +
+      `자버 설정 > AI 도구 연동(${KEY_ISSUE_URL})에서 개인 API 키를 새로 만들어 JOBER_API_KEY 를 바꾼 뒤 AI 도구를 다시 시작해 주세요. ` +
+      `키를 만든 분이 스페이스 관리자가 아니게 된 경우에도 이렇게 거절돼요. / ` +
+      `The Jober API key was rejected (HTTP 401): it may be mistyped or revoked. Create a new personal key at ${KEY_ISSUE_URL}.`
+    );
+  }
+  if (problem === 'TOKEN_EXPIRED') {
+    return (
+      `OAuth 연결 토큰(jbr_at_)이 만료됐거나 해제됐어요(HTTP 401). 이 토큰은 1시간 뒤 만료되고 이 패키지는 갱신하지 않아요. ` +
+      `${KEY_ISSUE_URL} 에서 개인 API 키(jbr_live_)를 만들어 JOBER_API_KEY 에 넣거나, AI 도구에 원격 주소 https://api.jober.io/mcp 를 직접 추가해 OAuth 로 연결하세요. / ` +
+      'The OAuth access token (jbr_at_) expired or was revoked (HTTP 401). Use a personal API key (jbr_live_) or connect the remote MCP URL with OAuth.'
+    );
+  }
   if (problem === 'COMPANY_KEY') {
     return (
       `JOBER_API_KEY 에 회사 API 키(jbr_co_)가 들어 있습니다. MCP 에는 개인 API 키(jbr_live_)만 쓸 수 있으니 ${KEY_ISSUE_URL} 에서 개인 API 키를 발급하세요. / ` +

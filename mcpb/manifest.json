@@ -1,0 +1,50 @@
+{
+  "$schema": "https://raw.githubusercontent.com/modelcontextprotocol/mcpb/main/dist/mcpb-manifest-v0.3.schema.json",
+  "manifest_version": "0.3",
+  "name": "jober-mcp",
+  "display_name": "자버 Jober 카카오 알림톡",
+  "version": "0.0.0",
+  "description": "자버(Jober)로 카카오 알림톡·이메일을 Claude 에서 바로 보내요. Send KakaoTalk AlimTalk and email campaigns in Korea.",
+  "long_description": "자버(Jober) 계정의 개인 API 키로 Claude Desktop 에서 카카오 알림톡·이메일 발송 초안을 만들고, 받는 분 화면 미리보기·테스트 발송·실발송까지 진행해요. 설치 창에서 '자버 개인 API 키' 칸에 키를 붙여 넣으면 끝이에요(Node.js 를 따로 설치하지 않아도 돼요). 키를 비워 두면 가입·키 발급 방법을 알려 주는 안내 모드(get_started)로 켜져요. 키는 자버 설정 > AI 도구 연동(https://jober.io/settings/integrations)에서 '발송까지(권장)'로 만들 수 있어요. 키 없이 연결하려면 Claude 설정 > 커넥터에 https://api.jober.io/mcp 를 추가하세요.",
+  "author": {
+    "name": "Jober",
+    "url": "https://jober.io"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jober-lab/jober-mcp"
+  },
+  "homepage": "https://jober.io/developers/mcp",
+  "documentation": "https://jober.io/developers/mcp",
+  "support": "https://github.com/jober-lab/jober-mcp/issues",
+  "icon": "icon.png",
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/index.js"],
+      "env": {
+        "JOBER_API_KEY": "${user_config.jober_api_key}"
+      }
+    }
+  },
+  "tools_generated": true,
+  "keywords": ["jober", "kakao", "alimtalk", "알림톡", "카카오알림톡", "email", "korea"],
+  "license": "MIT",
+  "compatibility": {
+    "platforms": ["darwin", "win32"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  },
+  "user_config": {
+    "jober_api_key": {
+      "type": "string",
+      "title": "자버 개인 API 키 (Jober personal API key)",
+      "description": "자버 설정 > AI 도구 연동에서 만든 개인 API 키(jbr_live_ 로 시작). 비워 두면 가입·키 발급 안내 모드로 켜져요. / Personal API key starting with jbr_live_. Leave empty to start in guide mode.",
+      "sensitive": true,
+      "required": false
+    }
+  }
+}
