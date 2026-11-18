@@ -132,7 +132,7 @@ export function describeKeyProblem(problem: KeyProblem): string {
   if (problem === 'REJECTED') {
     return (
       `자버 개인 API 키가 맞지 않거나 폐기된 키예요(HTTP 401). 키 전체를 앞뒤 공백 없이 붙여 넣었는지 확인하고, 그래도 안 되면 ` +
-      `자버 설정 > AI 도구 연동(${KEY_ISSUE_URL})에서 개인 API 키를 새로 만들어 JOBER_API_KEY 를 바꾼 뒤 AI 도구를 다시 시작해 주세요. ` +
+      `자버 설정 > AI 도구 연동(${KEY_ISSUE_URL})에서 개인 API 키를 새로 만들어 AI 도구에 넣은 키(JOBER_API_KEY 또는 확장 프로그램 설정)를 바꾼 뒤 AI 도구를 다시 시작해 주세요. ` +
       `키를 만든 분이 스페이스 관리자가 아니게 된 경우에도 이렇게 거절돼요. / ` +
       `The Jober API key was rejected (HTTP 401): it may be mistyped or revoked. Create a new personal key at ${KEY_ISSUE_URL}.`
     );

@@ -71,29 +71,12 @@ export function remoteErrorBody(error: StreamableHTTPError): Record<string, unkn
 }
 
 /**
- * 원격 문구 안 주소가 자버 주소(jober.io·하위 도메인)나 지금 연결한 원격 호스트뿐인지. 다른 곳으로 보내는 링크가 끼면 쓰지 않는다
- * (JOBER_API_BASE 오설정·중간 변조로 엉뚱한 링크를 사용자에게 보여 주지 않게).
+ * 원격 오류 본문의 jober.reason(코드)만 읽는다. 원격 문구(jober.message·message)는 사용자에게 옮기지 않고
+ * 코드를 패키지 고정 문구로 바꾼다(JOBER_API_BASE 오설정·중간 변조로 엉뚱한 링크·지시가 AI 에게 가지 않게, 2026-11-18 리뷰).
  */
-function hasOnlyTrustedUrls(text: string, endpoint: URL): boolean {
-  const urls = text.match(/https?:\/\/[^\s)'"<>]+/g) ?? [];
-  return urls.every((raw) => {
-    try {
-      const { hostname } = new URL(raw);
-      return hostname === 'jober.io' || hostname.endsWith('.jober.io') || hostname === endpoint.hostname;
-    } catch {
-      return false;
-    }
-  });
-}
-
-/** 원격 오류 본문의 한국어 안내(jober.message, 2026-11-18 서버). 너무 길거나, 문자열이 아니거나, 자버 밖 주소가 있으면 버린다. */
-function joberGuide(body: Record<string, unknown> | undefined, endpoint?: URL): { message?: string; reason?: string } {
+function joberReason(body: Record<string, unknown> | undefined): string | undefined {
   const jober = body && isRecord(body.jober) ? body.jober : undefined;
-  if (!jober) return {};
-  const raw = typeof jober.message === 'string' && jober.message.length > 0 && jober.message.length <= 1000 ? jober.message : undefined;
-  const message = raw && (!endpoint || hasOnlyTrustedUrls(raw, endpoint)) ? raw : undefined;
-  const reason = typeof jober.reason === 'string' ? jober.reason : undefined;
-  return { message, reason };
+  return jober && typeof jober.reason === 'string' ? jober.reason : undefined;
 }
 
 /** 원격이 키·토큰을 거절했는지(HTTP 401). */
@@ -101,36 +84,36 @@ export function isUnauthorized(error: unknown): error is StreamableHTTPError {
   return error instanceof StreamableHTTPError && error.code === 401;
 }
 
-// 서버 401 jober.reason 중 이 패키지가 문구를 그대로 쓰는 값(모르는 사유면 패키지 문구)
-const KNOWN_REJECTION_REASONS = new Set(['API_KEY_INVALID', 'COMPANY_KEY', 'NOT_MANAGER']);
-
 /**
- * 키 거절(401) 사유: 서버가 관리자 권한 상실이라 하면 그 문구, OAuth 토큰이면 패키지 문구(1시간 만료·갱신 안 함),
- * 그 밖은 아는 사유의 서버 문구 → 패키지 문구. 확장 프로그램(.mcpb)이면 키를 바꾸는 곳을 덧붙인다.
+ * 키 거절(401) 사유를 패키지 문구로. 서버 reason(2026-11-18 jober-api)이 관리자 권한 상실·회사 키면 그 뜻의 문구,
+ * OAuth 토큰(jbr_at_)이면 1시간 만료 안내, 그 밖(옛 서버 포함)은 키 오타·폐기 안내. 확장 프로그램(.mcpb)이면 키를 바꾸는 곳을 덧붙인다.
  */
-export function describeRejection(
-  error: StreamableHTTPError,
-  apiKey: string,
-  mcpb = false,
-  endpoint?: URL,
-): { problem: KeyProblem; detail: string } {
-  const { message, reason } = joberGuide(remoteErrorBody(error), endpoint);
+export function describeRejection(error: StreamableHTTPError, apiKey: string, mcpb = false): { problem: KeyProblem; detail: string } {
+  const reason = joberReason(remoteErrorBody(error));
   // 관리자 권한 상실은 토큰 만료가 아니므로 OAuth 토큰이어도 REJECTED(상태 줄과 사유가 어긋나지 않게)
   const problem: KeyProblem = isAccessToken(apiKey) && reason !== 'NOT_MANAGER' ? 'TOKEN_EXPIRED' : 'REJECTED';
-  const known = !!message && !!reason && KNOWN_REJECTION_REASONS.has(reason);
-  const base = known && (reason === 'NOT_MANAGER' || problem === 'REJECTED') ? (message as string) : describeKeyProblem(problem);
+  let base: string;
+  if (reason === 'NOT_MANAGER') base = NOT_MANAGER_TEXT;
+  else if (reason === 'COMPANY_KEY') base = describeKeyProblem('COMPANY_KEY');
+  else base = describeKeyProblem(problem);
   return { problem, detail: mcpb ? `${base} ${MCPB_KEY_HINT}` : base };
 }
 
+const NOT_MANAGER_TEXT =
+  '이 키(연결)를 만든 분이 지금은 이 스페이스의 관리자가 아니에요(HTTP 401). 스페이스 관리자에게 설정 > 초대 및 권한 설정에서 관리자 권한을 요청하거나, ' +
+  '관리자가 직접 키를 만들어 연결해 주세요. / The person who created this key is no longer a manager of the space.';
+
+const BLOCKED_TEXT =
+  '차단된 계정·스페이스이거나 차단된 접속 위치라 쓸 수 없어요(HTTP 403, J_41_25_3_4). 자버 고객센터에 문의해 주세요. / ' +
+  'The account, space or network location is blocked (HTTP 403, J_41_25_3_4).';
+
 /**
- * 권한 부족 403(insufficient_scope) 안내. 서버가 한국어 안내(jober.message)를 주면 그 문구를 쓴다.
- * 없으면(옛 서버) 개인 API 키는 "새 키 만들기", OAuth 연결 토큰(jbr_at_)은 "원격 주소로 다시 연결하거나 개인 키"를 안내한다.
+ * 권한 부족 403(insufficient_scope) 안내(패키지 고정 문구). 개인 API 키는 "새 키 만들기",
+ * OAuth 연결 토큰(jbr_at_)은 "원격 주소로 다시 연결하거나 개인 키". 빠진 권한은 error_description 에서 scope 모양만 뽑는다.
  */
-function describeInsufficientScope(body: Record<string, unknown> | undefined, accessToken: boolean, endpoint: URL): string {
-  const guided = joberGuide(body, endpoint).message;
-  if (guided) return guided;
+function describeInsufficientScope(body: Record<string, unknown> | undefined, accessToken: boolean): string {
   const description = body && typeof body.error_description === 'string' ? body.error_description : '';
-  const scopes = [...new Set(description.match(/[a-z]+:[a-z]+/g) ?? [])];
+  const scopes = [...new Set(description.match(/\b(?:campaign|contacts|survey|send):(?:read|write|execute)\b/g) ?? [])];
   const list = scopes.length > 0 ? `(${scopes.join(', ')})` : '';
   if (accessToken) {
     return (
@@ -153,7 +136,7 @@ export function describeRemoteError(error: unknown, endpoint: URL, apiKey = '', 
     const status = error.code ?? 0;
     const detail = truncate(error.message);
     if (status === 401) {
-      return joberGuide(remoteErrorBody(error), endpoint).message ?? describeKeyProblem('REJECTED');
+      return describeRejection(error, apiKey, mcpb).detail;
     }
     if (status === 403 && MCP_CLOSED_PATTERN.test(error.message)) {
       // 원격 403 본문 jober.message 와 같은 뜻(jober-api routes/mcp/auth.js requireMcpEnabledForbidden). 링크는 원격 값을 옮기지 않고 고정값.
@@ -165,15 +148,10 @@ export function describeRemoteError(error: unknown, endpoint: URL, apiKey = '', 
     if (status === 403) {
       const body = remoteErrorBody(error);
       if (body && body.error === 'insufficient_scope') {
-        const text = describeInsufficientScope(body, isAccessToken(apiKey), endpoint);
+        const text = describeInsufficientScope(body, isAccessToken(apiKey));
         return mcpb ? `${text} ${MCPB_KEY_HINT}` : text;
       }
-      const guide = joberGuide(body, endpoint);
-      if (guide.message) return guide.message;
-      // 차단(J_41_25_3_4) 등 서버가 한국어 message 를 준 경우(길이 제한·자버 밖 주소면 쓰지 않음)
-      if (body && typeof body.message === 'string' && typeof body.errorCode === 'string' && hasOnlyTrustedUrls(body.message, endpoint)) {
-        return `${truncate(body.message)} (HTTP 403, ${truncate(body.errorCode, 40)})`;
-      }
+      if (body && body.errorCode === 'J_41_25_3_4') return BLOCKED_TEXT;
       // 원격 본문 원문은 싣지 않는다(검증하지 않은 링크·문구가 사용자에게 가지 않게)
       return '권한이 없습니다(HTTP 403). API 키 권한을 확인하세요. / Forbidden (HTTP 403): check the API key permissions.';
     }
@@ -276,7 +254,7 @@ export function createProxyServer(config: ProxyConfig, version: string, proxyOpt
   /** 키 거절을 기록하고 안내 모드로 바꾼다. notify 면 클라이언트에 툴 목록이 바뀌었다고 알린다(tools/call 도중 거절). */
   const reject = (error: StreamableHTTPError, notify: boolean): { problem: KeyProblem; detail: string } => {
     if (!rejection) {
-      rejection = describeRejection(error, config.apiKey, mcpb, config.endpoint);
+      rejection = describeRejection(error, config.apiKey, mcpb);
       proxyOptions.onRejected?.(rejection.detail);
     }
     // tools/list·tools/call 이 동시에 거절돼도 tools/call 쪽 알림이 빠지지 않게 알림은 따로 한 번
@@ -308,7 +286,7 @@ export function createProxyServer(config: ProxyConfig, version: string, proxyOpt
   server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
     if (rejection) {
       return request.params.name === GUIDE_TOOL_NAME
-        ? getStartedResult(gettingStartedUrl, rejection.problem, proxyOptions.guide, rejection.detail)
+        ? getStartedResult(gettingStartedUrl, rejection.problem, proxyOptions.guide, rejection.detail, mcpb)
         : guideOnlyToolError(request.params.name, rejection.problem, rejection.detail);
     }
     const progressToken = request.params._meta?.progressToken;
